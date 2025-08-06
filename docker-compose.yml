@@ -1,0 +1,94 @@
+version: '3'
+services:
+  node1:
+    build: .
+    environment:
+      - NODE_ID=node1
+    ports:
+      - "8001:8000"
+    networks:
+      - kadnet
+
+  node2:
+    build: .
+    environment:
+      - NODE_ID=node2
+    ports:
+      - "8002:8000"
+    networks:
+      - kadnet
+
+  node3:
+    build: .
+    environment:
+      - NODE_ID=node3
+    ports:
+      - "8003:8000"
+    networks:
+      - kadnet
+
+  node4:
+    build: .
+    environment:
+      - NODE_ID=node4
+    ports:
+      - "8004:8000"
+    networks:
+      - kadnet
+
+  node5:
+    build: .
+    environment:
+      - NODE_ID=node5
+    ports:
+      - "8005:8000"
+    networks:
+      - kadnet
+
+  node6:
+    build: .
+    environment:
+      - NODE_ID=node6
+    ports:
+      - "8006:8000"
+    networks:
+      - kadnet
+
+  node7:
+    build: .
+    environment:
+      - NODE_ID=node7
+    ports:
+      - "8007:8000"
+    networks:
+      - kadnet
+
+  node8:
+    build: .
+    environment:
+      - NODE_ID=node8
+    ports:
+      - "8008:8000"
+    networks:
+      - kadnet
+
+  node9:
+    build: .
+    environment:
+      - NODE_ID=node9
+    ports:
+      - "8009:8000"
+    networks:
+      - kadnet
+
+  node10:
+    build: .
+    environment:
+      - NODE_ID=node10
+    ports:
+      - "8010:8000"
+    networks:
+      - kadnet
+
+networks:
+  kadnet:
