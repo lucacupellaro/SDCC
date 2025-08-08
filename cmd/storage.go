@@ -18,13 +18,17 @@ type ID [20]byte //160 bit ID
 
 func readCsv(path string) []string {
 
-    fmt.Printf("file: %s\n", path)
+   
+
+    //fmt.Printf("file: %s\n", path)
 
     file, err := os.Open(path)
     if err!=nil{
         fmt.Printf("Errore nell'aprire il file CSV: %s\n", err)
         log.Fatal(err)
     }
+
+    defer file.Close()
 
     reader:= csv.NewReader(file)
     
@@ -35,26 +39,20 @@ func readCsv(path string) []string {
         log.Fatal(err)
     }
 
-    print(records)
-
-    for i, row :=range records{
-        if len(row)<2{
-            fmt.Printf("Riga %d ha meno di 2 colonne",i)
+    
+    col1 := make([]string, 0, len(records))
+    for i := 1; i < len(records); i++ { // <-- parte da 1
+        row := records[i]
+        if len(row) < 2 {
+            fmt.Printf("Riga %d ha meno di 2 colonne\n", i)
             continue
-         
         }
+        col1 = append(col1, row[1])
+}
 
-        column1 := row[0]
-        column2 := row[1]
-        fmt.Printf("Riga %d: %s, %s\n", i, column1, column2)
-    }
 
-    //fmt.Printf("colonna 1: %s, colonna 2: %s\n", records[0][0], records[0][1])
-
-    file.Close()
     fmt.Println("CSV file read successfully")
-
-    return column1
+    return col1
 }
 
 
@@ -101,3 +99,32 @@ func generateID(list []string) []ID {
     fmt.Println("Generazione ID completata")
     return ids
 }
+
+/*
+
+func assignNFTToNode(nodeID string, nftList []string) []ID{
+    // Questa funzione dovrebbe assegnare una lista di NFT a un nodo specifico
+    if len(nftList) == 0 && nodeID == "" {
+        fmt.Println("Nessun NFT da assegnare O ID nodo vuoto")
+        return nil
+    }
+
+    result := make([]ID, len(nftList))
+    for i := 0;i < len(nftList); i++ {
+        result[i] =XOR(nftList[i],nodeID)
+    }
+
+    //ordina per distanza e prendo i primi 60
+    sort.Slice(result, func(i, j int) bool {
+        return result[i].LessThan(result[j])
+    })
+
+    if len(result) > 60 {
+        result = result[:60]
+    }
+
+    fmt.Println("Assegnazione NFTs al nodo completata")
+    return result
+}
+
+*/
