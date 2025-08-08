@@ -5,13 +5,9 @@ import( "encoding/csv"
         "crypto/sha256"
     "os"
     "log"
+    "sort"
     )
 
-type NFT struct {
-    ID     string
-    Name   string
-    Owner  string
-}
 
 type ID [20]byte //160 bit ID
 
@@ -100,31 +96,68 @@ func generateID(list []string) []ID {
     return ids
 }
 
+
+
+
+// Restituisce i k nodeID più vicini alla chiave dell'NFT
+func AssignNFTToNodes(key ID, nodes []ID, k int) []ID {
+	if k <= 0 || len(nodes) == 0 {
+		return nil
+	}
+	if k > len(nodes) {
+		k = len(nodes)
+	}
+
+	type pair struct {
+		id   ID
+		dist ID
+	}
+
+	pairs := make([]pair, len(nodes))
+	for i, nid := range nodes {
+		pairs[i] = pair{id: nid, dist: XOR(key, nid)}
+	}
+
+	sort.Slice(pairs, func(i, j int) bool {
+		return pairs[i].dist.LessThan(pairs[j].dist)
+	})
+
+	out := make([]ID, k)
+	for i := 0; i < k; i++ {
+		out[i] = pairs[i].id
+	}
+	return out
+}
+
 /*
+func VerifyTopK(nfts []NFT, nodes []ID, k int) error {
+	for  nft := range nfts {
+		// distanza dei nodi selezionati
+		sel := append([]ID(nil), nft.AssignedNodes...)
+		sort.Slice(sel, func(a, b int) bool {
+			return XOR(nft.TokenID, sel[a]).LessThan(XOR(nft.TokenID, sel[b]))
+		})
+		// k-esima (max tra i selezionati)
+		thr := XOR(nft.TokenID, sel[len(sel)-1])
 
-func assignNFTToNode(nodeID string, nftList []string) []ID{
-    // Questa funzione dovrebbe assegnare una lista di NFT a un nodo specifico
-    if len(nftList) == 0 && nodeID == "" {
-        fmt.Println("Nessun NFT da assegnare O ID nodo vuoto")
-        return nil
-    }
-
-    result := make([]ID, len(nftList))
-    for i := 0;i < len(nftList); i++ {
-        result[i] =XOR(nftList[i],nodeID)
-    }
-
-    //ordina per distanza e prendo i primi 60
-    sort.Slice(result, func(i, j int) bool {
-        return result[i].LessThan(result[j])
-    })
-
-    if len(result) > 60 {
-        result = result[:60]
-    }
-
-    fmt.Println("Assegnazione NFTs al nodo completata")
-    return result
+		// se esiste un nodo con distanza più piccola della soglia, fail
+		for _, nid := range nodes {
+			d := XOR(nft.TokenID, nid)
+			// d < thr ?
+			if d.LessThan(thr) {
+				// ma nid non è tra i selezionati? (set check)
+				inSelected := false
+				for _, s := range nft.AssignedNodes {
+					if s == nid { inSelected = true; break }
+				}
+				if !inSelected {
+					return fmt.Errorf("NFT %x: nodo %x ha distanza più piccola di %x ma non è stato selezionato",
+						nft.TokenID, nid, thr)
+				}
+			}
+		}
+	}
+	return nil
 }
 
 */
