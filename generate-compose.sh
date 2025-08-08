@@ -2,7 +2,7 @@
 
 N=10 # oppure leggi dal dataset
 
-echo "version: '3'" > docker-compose.yml
+
 echo "services:" >> docker-compose.yml
 
 for i in $(seq 1 $N); do

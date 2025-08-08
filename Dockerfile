@@ -1,17 +1,29 @@
-# Usa l'immagine ufficiale di Go come base
-FROM golang:1.21-alpine
+# ---- Stage build ----
+FROM golang:1.21-alpine AS build
 
-# Crea la directory di lavoro dentro il container
 WORKDIR /app
 
-# Copia i file del progetto nel container
+# 1) Cache mod
+COPY go.mod go.sum* ./
+RUN go mod download || true
+
+# 2) Codice (copre anche ./csv)
 COPY . .
 
-# Recupera le dipendenze
-RUN go mod tidy
+# 3) (opzionale) forza modules
+ENV GO111MODULE=on
 
-# Compila il main
-RUN go build -o node ./cmd/main.go
+# 4) Build dell'intero package cmd
+RUN go build -o /node ./cmd
 
-# Avvia il binario
-CMD ["./node"]
+# ---- Stage runtime ----
+FROM alpine:3.20
+WORKDIR /app
+
+# Binario
+COPY --from=build /node /app/node
+
+# CSV dentro l'immagine finale
+COPY --from=build /app/csv /app/csv
+
+CMD ["/app/node"]
