@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strings"
+	"time"
 )
 
 type NFT struct {
@@ -29,6 +31,15 @@ func main() {
 	isSeeder := os.Getenv("SEED") == "true"
 
 	if isSeeder {
+
+		// Avvia SEMPRE il server gRPC
+
+		// sul seeder avvialo in background
+		go func() {
+			if err := runGRPCServer(); err != nil {
+				log.Fatal(err)
+			}
+		}()
 
 		fmt.Printf("sono il seeder,\nReading CSV file...\n")
 
@@ -74,6 +85,15 @@ func main() {
 
 		}
 
+		// Lista esplicita dei nodi da controllare
+		targets := []string{"node7", "node9"}
+
+		for _, h := range targets {
+			if err := waitReady(h, 12*time.Second); err != nil {
+				log.Fatalf("❌ Nodo %s non pronto: %v", h, err) // fermati se uno non è pronto
+			}
+		}
+
 		fmt.Printf("NFT %d: %x,%s\n", 1, nfts[1].TokenID, DecodeID(nfts[1].TokenID))                                                     // ID del primo NFT
 		fmt.Printf("Assigned bytes Nodes %d: %x, nodo id: %s\n", 1, nfts[1].AssignedNodesToken, DecodeID(nfts[1].AssignedNodesToken[0])) // [NodeID1 NodeID2]
 
@@ -97,6 +117,17 @@ func main() {
 		fmt.Println("Salvataggio degli NFT assegnati ai nodi...")
 		// idToURL: mappa NodeID -> URL (riempila dai tuoi ENV / compose)
 
+		err := StoreNFTToNodes("BAYC#123", "BAYC #123", []string{"node7", "node9"}, 24*3600)
+		if err != nil {
+			fmt.Println("Errore:", err)
+		}
+
+	} else {
+		// sui non-seeder blocca qui
+		if err := runGRPCServer(); err != nil {
+			log.Fatal(err)
+		}
+		return
 	}
 
 }

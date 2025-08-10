@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package kad;
+
+// Cambia con il tuo module path (vedi passo 2)
+option go_package = "kademlia-nft/proto/kad;kad";
+
+// ---- Tipi minimi per Store ----
+message Node {
+  string id   = 1;
+  string host = 2;
+  int32  port = 3;
+}
+
+message Key { bytes key = 1; }
+
+message NFTValue { bytes bytes = 1; }
+
+message StoreReq {
+  Node     from     = 1;
+  Key      key      = 2;
+  NFTValue value    = 3;
+  int32    ttl_secs = 4; // opzionale
+}
+
+message StoreRes { bool ok = 1; }
+
+// ---- Servizio ----
+service Kademlia {
+  rpc Store (StoreReq) returns (StoreRes);
+}
