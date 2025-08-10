@@ -1,106 +1,108 @@
 package main
 
-import( "encoding/csv"
-        "fmt"
-        "crypto/sha256"
-    "os"
-    "log"
-    "sort"
-    )
-
+import (
+	"bytes"
+	"encoding/csv"
+	"fmt"
+	"log"
+	"os"
+	"sort"
+)
 
 type ID [20]byte //160 bit ID
 
-
 func readCsv(path string) []string {
 
-   
+	//fmt.Printf("file: %s\n", path)
 
-    //fmt.Printf("file: %s\n", path)
-
-    file, err := os.Open(path)
-    if err!=nil{
-        fmt.Printf("Errore nell'aprire il file CSV: %s\n", err)
-        log.Fatal(err)
-    }
-
-    defer file.Close()
-
-    reader:= csv.NewReader(file)
-    
-
-    records, err := reader.ReadAll()
-    if err!=nil{
-        fmt.Printf("Errore nella lettura del file CSV: %s\n", err)
-        log.Fatal(err)
-    }
-
-    
-    col1 := make([]string, 0, len(records))
-    for i := 1; i < len(records); i++ { // <-- parte da 1
-        row := records[i]
-        if len(row) < 2 {
-            fmt.Printf("Riga %d ha meno di 2 colonne\n", i)
-            continue
-        }
-        col1 = append(col1, row[1])
-}
-
-
-    fmt.Println("CSV file read successfully")
-    return col1
-}
-
-
-
-func NewIDFromToken(tokenID string) ID {
-    hash := sha256.Sum256([]byte(tokenID))
-    var id ID
-    copy(id[:], hash[:20])
-    return id
-}
-
-
-func XOR (a,b ID) ID {
-    var result ID
-    for i := 0; i < len(a); i++ {
-        result[i] = a[i] ^ b[i]
-    }
-    return result
-}
-
-// Ordina per distanza: a < b ?
-func (a ID) LessThan(b ID) bool {
-	for i := 0; i < len(a); i++ {
-		if a[i] < b[i] { return true }
-		if a[i] > b[i] { return false }
+	file, err := os.Open(path)
+	if err != nil {
+		fmt.Printf("Errore nell'aprire il file CSV: %s\n", err)
+		log.Fatal(err)
 	}
-	return false
+
+	defer file.Close()
+
+	reader := csv.NewReader(file)
+
+	records, err := reader.ReadAll()
+	if err != nil {
+		fmt.Printf("Errore nella lettura del file CSV: %s\n", err)
+		log.Fatal(err)
+	}
+
+	col1 := make([]string, 0, len(records))
+	for i := 1; i < len(records); i++ { // <-- parte da 1
+		row := records[i]
+		if len(row) < 2 {
+			fmt.Printf("Riga %d ha meno di 2 colonne\n", i)
+			continue
+		}
+		col1 = append(col1, row[1])
+	}
+
+	fmt.Println("CSV file read successfully")
+	return col1
 }
 
-
-//Generate a list of IDs from a list of tokens or Nodes
-func generateID(list []string) []ID {
-    if len(list) == 0 {
-        fmt.Println("Lista vuota, generazione ID di default")
-        return nil
-    }
-
-    ids := make([]ID, len(list)) // slice di ID
-
-    for i, tokenStr := range list {
-        ids[i] = NewIDFromToken(tokenStr)
-    }
-
-    fmt.Println("Generazione ID completata")
-    return ids
+func NewIDFromToken(tokenID string, size int) []byte {
+	b := []byte(tokenID)
+	if len(b) > size {
+		out := make([]byte, size)
+		copy(out, b[:size])
+		return out
+	}
+	padded := make([]byte, size)
+	copy(padded, b)
+	return padded
 }
 
+func DecodeID(b []byte) string {
+	return string(bytes.TrimRight(b, "\x00"))
+}
 
+func XOR(a, b []byte) []byte {
+	// assume stesse lunghezze; se no, usa la min
+	n := len(a)
+	if len(b) < n {
+		n = len(b)
+	}
+	out := make([]byte, n)
+	for i := 0; i < n; i++ {
+		out[i] = a[i] ^ b[i]
+	}
+	return out
+}
 
+// confronto lessicografico: true se a < b
+func LessThan(a, b []byte) bool {
+	n := len(a)
+	if len(b) < n {
+		n = len(b)
+	}
+	for i := 0; i < n; i++ {
+		if a[i] < b[i] {
+			return true
+		}
+		if a[i] > b[i] {
+			return false
+		}
+	}
+	// se prefissi uguali, quello più corto è “minore”
+	return len(a) < len(b)
+}
 
-// Restituisce i k nodeID più vicini alla chiave dell'NFT
-func AssignNFTToNodes(key ID, nodes []ID, k int) []ID {
+// Generate a list of IDs from a list of tokens or Nodes
+func generateBytesOfAllNfts(list []string) [][]byte {
+	ids := make([][]byte, len(list))
+	for i, s := range list {
+		ids[i] = NewIDFromToken(s, 20) // 20 bytes = 160 bit
+	}
+	return ids
+}
+
+// restituisce i k nodeID più vicini alla chiave (distanza XOR, ordinata crescente)
+func AssignNFTToNodes(key []byte, nodes [][]byte, k int) [][]byte {
 	if k <= 0 || len(nodes) == 0 {
 		return nil
 	}
@@ -109,55 +111,21 @@ func AssignNFTToNodes(key ID, nodes []ID, k int) []ID {
 	}
 
 	type pair struct {
-		id   ID
-		dist ID
+		id   []byte
+		dist []byte
 	}
-
 	pairs := make([]pair, len(nodes))
 	for i, nid := range nodes {
 		pairs[i] = pair{id: nid, dist: XOR(key, nid)}
 	}
 
 	sort.Slice(pairs, func(i, j int) bool {
-		return pairs[i].dist.LessThan(pairs[j].dist)
+		return LessThan(pairs[i].dist, pairs[j].dist)
 	})
 
-	out := make([]ID, k)
+	out := make([][]byte, k)
 	for i := 0; i < k; i++ {
 		out[i] = pairs[i].id
 	}
 	return out
 }
-
-/*
-func VerifyTopK(nfts []NFT, nodes []ID, k int) error {
-	for  nft := range nfts {
-		// distanza dei nodi selezionati
-		sel := append([]ID(nil), nft.AssignedNodes...)
-		sort.Slice(sel, func(a, b int) bool {
-			return XOR(nft.TokenID, sel[a]).LessThan(XOR(nft.TokenID, sel[b]))
-		})
-		// k-esima (max tra i selezionati)
-		thr := XOR(nft.TokenID, sel[len(sel)-1])
-
-		// se esiste un nodo con distanza più piccola della soglia, fail
-		for _, nid := range nodes {
-			d := XOR(nft.TokenID, nid)
-			// d < thr ?
-			if d.LessThan(thr) {
-				// ma nid non è tra i selezionati? (set check)
-				inSelected := false
-				for _, s := range nft.AssignedNodes {
-					if s == nid { inSelected = true; break }
-				}
-				if !inSelected {
-					return fmt.Errorf("NFT %x: nodo %x ha distanza più piccola di %x ma non è stato selezionato",
-						nft.TokenID, nid, thr)
-				}
-			}
-		}
-	}
-	return nil
-}
-
-*/

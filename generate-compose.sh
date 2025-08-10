@@ -3,14 +3,19 @@ set -euo pipefail
 
 N=11
 
-# Costruisci la lista "node2:8000,node3:8000,...,nodeN:8000"
+# NODES = "node2,node3,..."
 NODES=""
 for i in $(seq 2 "$N"); do
   NODES+="node$i,"
 done
-NODES="${NODES%,}"  # togli la virgola finale
+NODES="${NODES%,}"
 
-# Sovrascrivi il file docker-compose.yml
+# (Consiglio) prepara le cartelle per i bind mounts
+mkdir -p data
+for i in $(seq 1 "$N"); do
+  mkdir -p "data/node$i"
+done
+
 cat > docker-compose.yml <<EOF
 services:
 EOF
@@ -21,9 +26,9 @@ for i in $(seq 1 "$N"); do
     build: .
     environment:
       - NODE_ID=node$i
+      - DATA_DIR=/data
 EOF
 
-  # Solo il primo nodo ha SEED e la lista dei peer
   if [ "$i" -eq 1 ]; then
     cat >> docker-compose.yml <<EOF
       - SEED=true
@@ -34,6 +39,8 @@ EOF
   cat >> docker-compose.yml <<EOF
     ports:
       - "$((8000 + i)):8000"
+    volumes:
+      - ./data/node$i:/data
     networks:
       - kadnet
 
