@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -18,8 +19,6 @@ import (
 
 	pb "kademlia-nft/proto/kad"
 )
-
-type ID [20]byte //160 bit ID
 
 func readCsv(path string) []string {
 
@@ -53,6 +52,30 @@ func readCsv(path string) []string {
 
 	fmt.Println("CSV file read successfully")
 	return col1
+}
+
+func readCsv2(path string) [][]string {
+
+	//fmt.Printf("file: %s\n", path)
+
+	file, err := os.Open(path)
+	if err != nil {
+		fmt.Printf("Errore nell'aprire il file CSV: %s\n", err)
+		log.Fatal(err)
+	}
+
+	defer file.Close()
+
+	reader := csv.NewReader(file)
+
+	records, err := reader.ReadAll()
+	if err != nil {
+		fmt.Printf("Errore nella lettura del file CSV: %s\n", err)
+		log.Fatal(err)
+	}
+
+	fmt.Println("CSV file read successfully")
+	return records
 }
 
 func NewIDFromToken(tokenID string, size int) []byte {
@@ -142,7 +165,7 @@ func AssignNFTToNodes(key []byte, nodes [][]byte, k int) [][]byte {
 
 // StoreNFTToNodes invia lo stesso NFT a tutti i nodi indicati.
 // Ritorna nil se TUTTE le store vanno a buon fine; altrimenti un error descrittivo.
-func StoreNFTToNodes(tokenID string, name string, nodes []string, ttlSecs int32) error {
+func StoreNFTToNodes(nft NFT, tokenID string, name string, nodes []string, ttlSecs int32) error {
 	// chiave Kademlia a 20 byte (coerente con il resto del tuo codice)
 	key := NewIDFromToken(tokenID, 20)
 
@@ -150,9 +173,43 @@ func StoreNFTToNodes(tokenID string, name string, nodes []string, ttlSecs int32)
 	payload, _ := json.Marshal(struct {
 		TokenID string `json:"token_id"`
 		Name    string `json:"name"`
+
+		Index string `json:"index,omitempty"`
+
+		Volume            string `json:"volume,omitempty"`
+		Volume_USD        string `json:"volume_usd,omitempty"`
+		Market_Cap        string `json:"market_cap,omitempty"`
+		Market_Cap_USD    string `json:"market_cap_usd,omitempty"`
+		Sales             string `json:"sales,omitempty"`
+		Floor_Price       string `json:"floor_price,omitempty"`
+		Floor_Price_USD   string `json:"floor_price_usd,omitempty"`
+		Average_Price     string `json:"average_price,omitempty"`
+		Average_Price_USD string `json:"average_price_usd,omitempty"`
+		Owners            string `json:"owners,omitempty"`
+		Assets            string `json:"assets,omitempty"`
+		Owner_Asset_Ratio string `json:"owner_asset_ratio,omitempty"`
+		Category          string `json:"category,omitempty"`
+		Website           string `json:"website,omitempty"`
+		Logo              string `json:"logo,omitempty"`
 	}{
-		TokenID: tokenID,
-		Name:    name,
+		TokenID:           tokenID,
+		Name:              name,
+		Index:             nft.Index,
+		Volume:            nft.Volume,
+		Volume_USD:        nft.Volume_USD,
+		Market_Cap:        nft.Market_Cap,
+		Market_Cap_USD:    nft.Market_Cap_USD,
+		Sales:             nft.Sales,
+		Floor_Price:       nft.Floor_Price,
+		Floor_Price_USD:   nft.Floor_Price_USD,
+		Average_Price:     nft.Average_Price,
+		Average_Price_USD: nft.Average_Price_USD,
+		Owners:            nft.Owners,
+		Assets:            nft.Assets,
+		Owner_Asset_Ratio: nft.Owner_Asset_Ratio,
+		Category:          nft.Category,
+		Website:           nft.Website,
+		Logo:              nft.Logo,
 	})
 
 	var errs []string
@@ -187,7 +244,7 @@ func StoreNFTToNodes(tokenID string, name string, nodes []string, ttlSecs int32)
 			continue
 		}
 
-		fmt.Printf("✅ Salvato NFT %q su %s\n", tokenID, host)
+		fmt.Printf("✅  NFT inviato %q su %s\n", tokenID, host)
 	}
 
 	if len(errs) > 0 {
@@ -203,9 +260,26 @@ type server struct {
 	// TODO: qui il tuo storage (Badger/LevelDB). Per ora solo log.
 }
 
+// Store implementa il metodo Store del servizio Kademlia.
 func (s *server) Store(ctx context.Context, req *pb.StoreReq) (*pb.StoreRes, error) {
-	// TODO: salva req.Value.Bytes nel tuo DB locale in /data usando req.Key.Key come chiave
-	log.Printf("[STORE] key=%x bytes=%d ttl=%d", req.Key.Key, len(req.Value.Bytes), req.TtlSecs)
+	dataDir := strings.TrimSpace(os.Getenv("DATA_DIR"))
+	if dataDir == "" {
+		dataDir = "/data" // default nel container
+	}
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		return nil, fmt.Errorf("creazione dir %s: %w", dataDir, err)
+	}
+
+	fileName := fmt.Sprintf("%x.json", req.Key.Key)
+	filePath := filepath.Join(dataDir, fileName)
+
+	// (facoltativo) log utile per conferma
+	abs, _ := filepath.Abs(filePath)
+	log.Printf("✅ Salvato NFT in %s (abs=%s)", filePath, abs)
+
+	if err := os.WriteFile(filePath, req.Value.Bytes, 0644); err != nil {
+		return nil, fmt.Errorf("scrittura file %s: %w", filePath, err)
+	}
 	return &pb.StoreRes{Ok: true}, nil
 }
 
@@ -240,4 +314,25 @@ func waitReady(host string, timeout time.Duration) error {
 		}
 		time.Sleep(300 * time.Millisecond)
 	}
+}
+
+// Su HOST: elenca i file in ./data/<nodeID>
+// (se la esegui DENTRO al container, usa base := "/data" e ignora nodeID)
+func ListNodeVolumeFiles(nodeID string) ([]string, error) {
+	base := "./data" // nel container metti "/data"
+	dir := filepath.Join(base, nodeID)
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	var files []string
+	for _, e := range entries {
+		if !e.IsDir() {
+			files = append(files, e.Name())
+		}
+	}
+	sort.Strings(files)
+	return files, nil
 }

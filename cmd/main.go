@@ -9,8 +9,27 @@ import (
 )
 
 type NFT struct {
+	// colonne CSV
+	Index             string
+	Name              string
+	Volume            string
+	Volume_USD        string
+	Market_Cap        string
+	Market_Cap_USD    string
+	Sales             string
+	Floor_Price       string
+	Floor_Price_USD   string
+	Average_Price     string
+	Average_Price_USD string
+	Owners            string
+	Assets            string
+	Owner_Asset_Ratio string
+	Category          string
+	Website           string
+	Logo              string
+
+	// campi interni al tuo sistema
 	TokenID            []byte
-	Name               string
 	AssignedNodesToken [][]byte
 }
 
@@ -18,7 +37,8 @@ func main() {
 
 	var listNFT []string
 	var listNFTId [][]byte
-	var i int
+
+	var csvAll [][]string
 
 	// Prende l'ID del nodo dall'ambiente
 	nodeID := os.Getenv("NODE_ID")
@@ -26,28 +46,18 @@ func main() {
 		nodeID = "default"
 	}
 
-	fmt.Println("Avviato nodo:", nodeID)
+	fmt.Println("Avviato nodo:", nodeID, "PID:", os.Getpid())
 
 	isSeeder := os.Getenv("SEED") == "true"
 
 	if isSeeder {
 
-		// Avvia SEMPRE il server gRPC
-
-		// sul seeder avvialo in background
-		go func() {
-			if err := runGRPCServer(); err != nil {
-				log.Fatal(err)
-			}
-		}()
-
 		fmt.Printf("sono il seeder,\nReading CSV file...\n")
 
 		listNFT = readCsv("csv/NFT_Top_Collections.csv")
+		csvAll = readCsv2("csv/NFT_Top_Collections.csv")
 
 		fmt.Printf("NFT letti: %d\n", len(listNFT))
-
-		fmt.Printf("NFT letto da csv: %s\n", listNFT[0])
 
 		// Genera gli ID per la lista di NFT
 		fmt.Printf("Generating IDs for NFTs...\n")
@@ -76,50 +86,87 @@ func main() {
 		fmt.Println("Assegnazione dei k nodeID più vicini agli NFT...")
 
 		nfts := make([]NFT, len(listNFTId))
-		for i = 0; i < len(listNFTId); i++ {
-			//fmt.Printf("Assegnazione NFT %x\n", listNFTId[i])
+		for i := 0; i < len(listNFTId); i++ {
+			row := csvAll[i]
+			// accessor sicuro per colonne mancanti
+			col := func(k int) string {
+				if k >= 0 && k < len(row) {
+					return strings.TrimSpace(row[k])
+				}
+				return ""
+			}
+
 			nfts[i] = NFT{
+				// campi CSV
+				Index:             col(0),
+				Name:              col(1),
+				Volume:            col(2),
+				Volume_USD:        col(3),
+				Market_Cap:        col(4),
+				Market_Cap_USD:    col(5),
+				Sales:             col(6),
+				Floor_Price:       col(7),
+				Floor_Price_USD:   col(8),
+				Average_Price:     col(9),
+				Average_Price_USD: col(10),
+				Owners:            col(11),
+				Assets:            col(12),
+				Owner_Asset_Ratio: col(13),
+				Category:          col(14),
+				Website:           col(15),
+				Logo:              col(16),
+
+				// campi interni
 				TokenID:            listNFTId[i],
 				AssignedNodesToken: AssignNFTToNodes(listNFTId[i], iDnew, 2),
 			}
-
 		}
 
-		// Lista esplicita dei nodi da controllare
-		targets := []string{"node7", "node9"}
+		/*
 
-		for _, h := range targets {
+			nfts := make([]NFT, len(listNFTId))
+			for i = 0; i < len(listNFTId); i++ {
+				//fmt.Printf("Assegnazione NFT %x\n", listNFTId[i])
+				nfts[i] = NFT{
+					TokenID:            listNFTId[i],
+					AssignedNodesToken: AssignNFTToNodes(listNFTId[i], iDnew, 2),
+				}
+
+			}
+		*/
+
+		// Lista esplicita dei nodi da controllare
+		//targets := []string{"node7", "node9"}
+
+		for _, h := range parts {
 			if err := waitReady(h, 12*time.Second); err != nil {
 				log.Fatalf("❌ Nodo %s non pronto: %v", h, err) // fermati se uno non è pronto
 			}
 		}
 
-		fmt.Printf("NFT %d: %x,%s\n", 1, nfts[1].TokenID, DecodeID(nfts[1].TokenID))                                                     // ID del primo NFT
+		fmt.Printf("NFT %d: %x,%s,%s\n", 0, nfts[1].TokenID, DecodeID(nfts[1].TokenID), nfts[1].Volume_USD)                              // ID del primo NFT
 		fmt.Printf("Assigned bytes Nodes %d: %x, nodo id: %s\n", 1, nfts[1].AssignedNodesToken, DecodeID(nfts[1].AssignedNodesToken[0])) // [NodeID1 NodeID2]
 
-		/*
-					// Stampa i risultati
-					for i := 0; i < len(listNFTId); i++ {
-						fmt.Printf("NFT %d: %x\n", i, nfts[i].TokenID)       // ID del primo NFT
-						fmt.Printf("Assigned Nodes %d: %x\n", i, nfts[i].AssignedNodesToken) // [NodeID1 NodeID2]
-					}
-			/*
+		//-------------Salvatggio degli NFT sugli appositi Nodi-------------------------------------------------------------------//
 
-
-						if err := VerifyTopK(nfts, iDnew, 2); err != nil {
-							fmt.Println("VERIFICA FALLITA:", err)
-						} else {
-							fmt.Println("Verifica OK: ogni NFT è assegnato ai 2 nodi più vicini.")
-						}
-		*/
-
-		//-------------Salvatggio degli NFT sull'apposito Nodo----//
 		fmt.Println("Salvataggio degli NFT assegnati ai nodi...")
-		// idToURL: mappa NodeID -> URL (riempila dai tuoi ENV / compose)
 
-		err := StoreNFTToNodes("BAYC#123", "BAYC #123", []string{"node7", "node9"}, 24*3600)
-		if err != nil {
-			fmt.Println("Errore:", err)
+		fmt.Printf("struct size: %d\n", len(nfts))
+
+		for j := 0; j < len(nfts); j++ {
+			var nodi []string
+			nodi = append(nodi, DecodeID(nfts[j].AssignedNodesToken[0]))
+			nodi = append(nodi, DecodeID(nfts[j].AssignedNodesToken[1]))
+
+			if err := StoreNFTToNodes(nfts[j], DecodeID(nfts[j].TokenID), nfts[j].Name, nodi, 24*3600); err != nil {
+				fmt.Println("Errore:", err)
+				continue
+			}
+
+			fmt.Printf("Salvati NFT numero: %d\n", j)
+
+			nodi = nil
+
 		}
 
 	} else {

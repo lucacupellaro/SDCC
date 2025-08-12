@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package kad;
 
-// Cambia con il tuo module path (vedi passo 2)
+
 option go_package = "kademlia-nft/proto/kad;kad";
 
 // ---- Tipi minimi per Store ----
