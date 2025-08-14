@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v3.21.12
-// source: proto/kad.proto
+// source: kad.proto
 
 package kad
 
@@ -19,7 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Kademlia_Store_FullMethodName = "/kad.Kademlia/Store"
+	Kademlia_Store_FullMethodName       = "/kad.Kademlia/Store"
+	Kademlia_GetNodeList_FullMethodName = "/kad.Kademlia/GetNodeList"
 )
 
 // KademliaClient is the client API for Kademlia service.
@@ -29,6 +30,7 @@ const (
 // ---- Servizio ----
 type KademliaClient interface {
 	Store(ctx context.Context, in *StoreReq, opts ...grpc.CallOption) (*StoreRes, error)
+	GetNodeList(ctx context.Context, in *GetNodeListReq, opts ...grpc.CallOption) (*GetNodeListRes, error)
 }
 
 type kademliaClient struct {
@@ -49,6 +51,16 @@ func (c *kademliaClient) Store(ctx context.Context, in *StoreReq, opts ...grpc.C
 	return out, nil
 }
 
+func (c *kademliaClient) GetNodeList(ctx context.Context, in *GetNodeListReq, opts ...grpc.CallOption) (*GetNodeListRes, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetNodeListRes)
+	err := c.cc.Invoke(ctx, Kademlia_GetNodeList_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // KademliaServer is the server API for Kademlia service.
 // All implementations must embed UnimplementedKademliaServer
 // for forward compatibility.
@@ -56,6 +68,7 @@ func (c *kademliaClient) Store(ctx context.Context, in *StoreReq, opts ...grpc.C
 // ---- Servizio ----
 type KademliaServer interface {
 	Store(context.Context, *StoreReq) (*StoreRes, error)
+	GetNodeList(context.Context, *GetNodeListReq) (*GetNodeListRes, error)
 	mustEmbedUnimplementedKademliaServer()
 }
 
@@ -68,6 +81,9 @@ type UnimplementedKademliaServer struct{}
 
 func (UnimplementedKademliaServer) Store(context.Context, *StoreReq) (*StoreRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Store not implemented")
+}
+func (UnimplementedKademliaServer) GetNodeList(context.Context, *GetNodeListReq) (*GetNodeListRes, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetNodeList not implemented")
 }
 func (UnimplementedKademliaServer) mustEmbedUnimplementedKademliaServer() {}
 func (UnimplementedKademliaServer) testEmbeddedByValue()                  {}
@@ -108,6 +124,24 @@ func _Kademlia_Store_Handler(srv interface{}, ctx context.Context, dec func(inte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Kademlia_GetNodeList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetNodeListReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(KademliaServer).GetNodeList(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Kademlia_GetNodeList_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(KademliaServer).GetNodeList(ctx, req.(*GetNodeListReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Kademlia_ServiceDesc is the grpc.ServiceDesc for Kademlia service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -119,7 +153,11 @@ var Kademlia_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "Store",
 			Handler:    _Kademlia_Store_Handler,
 		},
+		{
+			MethodName: "GetNodeList",
+			Handler:    _Kademlia_GetNodeList_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "proto/kad.proto",
+	Metadata: "kad.proto",
 }

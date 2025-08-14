@@ -3,7 +3,7 @@ syntax = "proto3";
 package kad;
 
 
-option go_package = "kademlia-nft/proto/kad;kad";
+option go_package = "proto/kad;kad";
 
 // ---- Tipi minimi per Store ----
 message Node {
@@ -25,7 +25,18 @@ message StoreReq {
 
 message StoreRes { bool ok = 1; }
 
+message GetNodeListReq {
+  string requester_id = 1;  
+}
+
+message GetNodeListRes {
+  repeated Node nodes = 1;  // qui specifichi che è una lista di Node
+}
+
+
 // ---- Servizio ----
 service Kademlia {
   rpc Store (StoreReq) returns (StoreRes);
+  rpc GetNodeList (GetNodeListReq) returns (GetNodeListRes);
+
 }

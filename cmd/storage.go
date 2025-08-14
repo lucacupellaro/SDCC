@@ -255,13 +255,8 @@ func StoreNFTToNodes(nft NFT, tokenID string, name string, nodes []string, ttlSe
 
 // ===== Server RPC =====
 
-type server struct {
-	pb.UnimplementedKademliaServer
-	// TODO: qui il tuo storage (Badger/LevelDB). Per ora solo log.
-}
-
 // Store implementa il metodo Store del servizio Kademlia.
-func (s *server) Store(ctx context.Context, req *pb.StoreReq) (*pb.StoreRes, error) {
+func (s *KademliaServer) Store(ctx context.Context, req *pb.StoreReq) (*pb.StoreRes, error) {
 	dataDir := strings.TrimSpace(os.Getenv("DATA_DIR"))
 	if dataDir == "" {
 		dataDir = "/data" // default nel container
@@ -289,7 +284,7 @@ func runGRPCServer() error {
 		return err
 	}
 	gs := grpc.NewServer()
-	pb.RegisterKademliaServer(gs, &server{})
+	pb.RegisterKademliaServer(gs, &KademliaServer{})
 	log.Println("gRPC server in ascolto su :8000")
 	return gs.Serve(lis) // BLOCCA
 }

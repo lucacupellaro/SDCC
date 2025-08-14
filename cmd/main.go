@@ -52,6 +52,14 @@ func main() {
 
 	if isSeeder {
 
+		go func() {
+			if err := runGRPCServer(); err != nil {
+				log.Fatalf("gRPC server error (seeder): %v", err)
+			}
+		}()
+
+		time.Sleep(300 * time.Millisecond)
+
 		fmt.Printf("sono il seeder,\nReading CSV file...\n")
 
 		listNFT = readCsv("csv/NFT_Top_Collections.csv")
@@ -163,18 +171,59 @@ func main() {
 				continue
 			}
 
-			fmt.Printf("Salvati NFT numero: %d\n", j)
+			//fmt.Printf("Salvati NFT numero: %d\n", j)
 
 			nodi = nil
 
 		}
 
 	} else {
-		// sui non-seeder blocca qui
+
+		var nodes []string
+		var TokenNodo []byte
+		var Bucket [][]byte
+		var BucketSort [][]byte
+
+		nodeID := os.Getenv("NODE_ID")
+		if nodeID == "" {
+			nodeID = "default"
+		}
+
+		TokenNodo = NewIDFromToken(nodeID, 20)
+
+		fmt.Printf("Sono il nodo %s, PID: %d\n", DecodeID(TokenNodo), os.Getpid())
+
+		//---------Recuperlo la lista dei nodi chiedendola al Seeder-------------------------
+		nodes, err := GetNodeListIDs("node1:8000", os.Getenv("NODE_ID"))
+
+		if err != nil {
+			log.Fatalf("Errore recupero nodi dal seeder: %v", err)
+		}
+
+		var nodiTokenizati [][]byte
+		for i := 0; i < len(nodes); i++ {
+			nodiTokenizati = append(nodiTokenizati, NewIDFromToken(nodes[i], 20))
+		}
+
+		//--------------------Ogni container si trova i k bucket piu vicini e li salva nel proprio volume-------------------//
+
+		Bucket = AssignNFTToNodes(TokenNodo, nodiTokenizati, 8)
+
+		BucketSort = removeAndSortMe(Bucket, TokenNodo)
+
+		fmt.Printf("sto salvando il kbucket per il nodo,%s\n", DecodeID(TokenNodo))
+
+		err2 := SaveKBucket(nodeID, BucketSort, "/data/kbucket.json")
+
+		if err2 != nil {
+			log.Fatalf("Errore salvataggio K-bucket: %v", err)
+		}
+
+		//-------------------I container si mettono in ascolto qui-------------------//
 		if err := runGRPCServer(); err != nil {
 			log.Fatal(err)
 		}
-		return
+
 	}
 
 }
