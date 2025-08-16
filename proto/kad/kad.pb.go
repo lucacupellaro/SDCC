@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.7
 // 	protoc        v3.21.12
-// source: kad.proto
+// source: proto/kad.proto
 
 package kad
 
@@ -33,7 +33,7 @@ type Node struct {
 
 func (x *Node) Reset() {
 	*x = Node{}
-	mi := &file_kad_proto_msgTypes[0]
+	mi := &file_proto_kad_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -45,7 +45,7 @@ func (x *Node) String() string {
 func (*Node) ProtoMessage() {}
 
 func (x *Node) ProtoReflect() protoreflect.Message {
-	mi := &file_kad_proto_msgTypes[0]
+	mi := &file_proto_kad_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -58,7 +58,7 @@ func (x *Node) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Node.ProtoReflect.Descriptor instead.
 func (*Node) Descriptor() ([]byte, []int) {
-	return file_kad_proto_rawDescGZIP(), []int{0}
+	return file_proto_kad_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *Node) GetId() string {
@@ -91,7 +91,7 @@ type Key struct {
 
 func (x *Key) Reset() {
 	*x = Key{}
-	mi := &file_kad_proto_msgTypes[1]
+	mi := &file_proto_kad_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -103,7 +103,7 @@ func (x *Key) String() string {
 func (*Key) ProtoMessage() {}
 
 func (x *Key) ProtoReflect() protoreflect.Message {
-	mi := &file_kad_proto_msgTypes[1]
+	mi := &file_proto_kad_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -116,7 +116,7 @@ func (x *Key) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Key.ProtoReflect.Descriptor instead.
 func (*Key) Descriptor() ([]byte, []int) {
-	return file_kad_proto_rawDescGZIP(), []int{1}
+	return file_proto_kad_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *Key) GetKey() []byte {
@@ -135,7 +135,7 @@ type NFTValue struct {
 
 func (x *NFTValue) Reset() {
 	*x = NFTValue{}
-	mi := &file_kad_proto_msgTypes[2]
+	mi := &file_proto_kad_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -147,7 +147,7 @@ func (x *NFTValue) String() string {
 func (*NFTValue) ProtoMessage() {}
 
 func (x *NFTValue) ProtoReflect() protoreflect.Message {
-	mi := &file_kad_proto_msgTypes[2]
+	mi := &file_proto_kad_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -160,7 +160,7 @@ func (x *NFTValue) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NFTValue.ProtoReflect.Descriptor instead.
 func (*NFTValue) Descriptor() ([]byte, []int) {
-	return file_kad_proto_rawDescGZIP(), []int{2}
+	return file_proto_kad_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *NFTValue) GetBytes() []byte {
@@ -182,7 +182,7 @@ type StoreReq struct {
 
 func (x *StoreReq) Reset() {
 	*x = StoreReq{}
-	mi := &file_kad_proto_msgTypes[3]
+	mi := &file_proto_kad_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -194,7 +194,7 @@ func (x *StoreReq) String() string {
 func (*StoreReq) ProtoMessage() {}
 
 func (x *StoreReq) ProtoReflect() protoreflect.Message {
-	mi := &file_kad_proto_msgTypes[3]
+	mi := &file_proto_kad_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -207,7 +207,7 @@ func (x *StoreReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StoreReq.ProtoReflect.Descriptor instead.
 func (*StoreReq) Descriptor() ([]byte, []int) {
-	return file_kad_proto_rawDescGZIP(), []int{3}
+	return file_proto_kad_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *StoreReq) GetFrom() *Node {
@@ -247,7 +247,7 @@ type StoreRes struct {
 
 func (x *StoreRes) Reset() {
 	*x = StoreRes{}
-	mi := &file_kad_proto_msgTypes[4]
+	mi := &file_proto_kad_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -259,7 +259,7 @@ func (x *StoreRes) String() string {
 func (*StoreRes) ProtoMessage() {}
 
 func (x *StoreRes) ProtoReflect() protoreflect.Message {
-	mi := &file_kad_proto_msgTypes[4]
+	mi := &file_proto_kad_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -272,7 +272,7 @@ func (x *StoreRes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StoreRes.ProtoReflect.Descriptor instead.
 func (*StoreRes) Descriptor() ([]byte, []int) {
-	return file_kad_proto_rawDescGZIP(), []int{4}
+	return file_proto_kad_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *StoreRes) GetOk() bool {
@@ -291,7 +291,7 @@ type GetNodeListReq struct {
 
 func (x *GetNodeListReq) Reset() {
 	*x = GetNodeListReq{}
-	mi := &file_kad_proto_msgTypes[5]
+	mi := &file_proto_kad_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -303,7 +303,7 @@ func (x *GetNodeListReq) String() string {
 func (*GetNodeListReq) ProtoMessage() {}
 
 func (x *GetNodeListReq) ProtoReflect() protoreflect.Message {
-	mi := &file_kad_proto_msgTypes[5]
+	mi := &file_proto_kad_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -316,7 +316,7 @@ func (x *GetNodeListReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetNodeListReq.ProtoReflect.Descriptor instead.
 func (*GetNodeListReq) Descriptor() ([]byte, []int) {
-	return file_kad_proto_rawDescGZIP(), []int{5}
+	return file_proto_kad_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *GetNodeListReq) GetRequesterId() string {
@@ -335,7 +335,7 @@ type GetNodeListRes struct {
 
 func (x *GetNodeListRes) Reset() {
 	*x = GetNodeListRes{}
-	mi := &file_kad_proto_msgTypes[6]
+	mi := &file_proto_kad_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -347,7 +347,7 @@ func (x *GetNodeListRes) String() string {
 func (*GetNodeListRes) ProtoMessage() {}
 
 func (x *GetNodeListRes) ProtoReflect() protoreflect.Message {
-	mi := &file_kad_proto_msgTypes[6]
+	mi := &file_proto_kad_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -360,7 +360,7 @@ func (x *GetNodeListRes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetNodeListRes.ProtoReflect.Descriptor instead.
 func (*GetNodeListRes) Descriptor() ([]byte, []int) {
-	return file_kad_proto_rawDescGZIP(), []int{6}
+	return file_proto_kad_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetNodeListRes) GetNodes() []*Node {
@@ -370,11 +370,131 @@ func (x *GetNodeListRes) GetNodes() []*Node {
 	return nil
 }
 
-var File_kad_proto protoreflect.FileDescriptor
+type LookupNFTReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FromId        string                 `protobuf:"bytes,1,opt,name=from_id,json=fromId,proto3" json:"from_id,omitempty"` // id del nodo che fa la richiesta (per logging)
+	Key           *Key                   `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`                     // chiave NFT (20 byte come fai tu)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
 
-const file_kad_proto_rawDesc = "" +
+func (x *LookupNFTReq) Reset() {
+	*x = LookupNFTReq{}
+	mi := &file_proto_kad_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LookupNFTReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LookupNFTReq) ProtoMessage() {}
+
+func (x *LookupNFTReq) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_kad_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LookupNFTReq.ProtoReflect.Descriptor instead.
+func (*LookupNFTReq) Descriptor() ([]byte, []int) {
+	return file_proto_kad_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *LookupNFTReq) GetFromId() string {
+	if x != nil {
+		return x.FromId
+	}
+	return ""
+}
+
+func (x *LookupNFTReq) GetKey() *Key {
+	if x != nil {
+		return x.Key
+	}
+	return nil
+}
+
+type LookupNFTRes struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Found         bool                   `protobuf:"varint,1,opt,name=found,proto3" json:"found,omitempty"`    // true se presente su questo nodo
+	Holder        *Node                  `protobuf:"bytes,2,opt,name=holder,proto3" json:"holder,omitempty"`   // questo nodo (se found=true)
+	Value         *NFTValue              `protobuf:"bytes,3,opt,name=value,proto3" json:"value,omitempty"`     // il contenuto (json bytes) se found=true
+	Nearest       []*Node                `protobuf:"bytes,4,rep,name=nearest,proto3" json:"nearest,omitempty"` // suggerimento nodi più vicini se non trovato
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LookupNFTRes) Reset() {
+	*x = LookupNFTRes{}
+	mi := &file_proto_kad_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LookupNFTRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LookupNFTRes) ProtoMessage() {}
+
+func (x *LookupNFTRes) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_kad_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LookupNFTRes.ProtoReflect.Descriptor instead.
+func (*LookupNFTRes) Descriptor() ([]byte, []int) {
+	return file_proto_kad_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *LookupNFTRes) GetFound() bool {
+	if x != nil {
+		return x.Found
+	}
+	return false
+}
+
+func (x *LookupNFTRes) GetHolder() *Node {
+	if x != nil {
+		return x.Holder
+	}
+	return nil
+}
+
+func (x *LookupNFTRes) GetValue() *NFTValue {
+	if x != nil {
+		return x.Value
+	}
+	return nil
+}
+
+func (x *LookupNFTRes) GetNearest() []*Node {
+	if x != nil {
+		return x.Nearest
+	}
+	return nil
+}
+
+var File_proto_kad_proto protoreflect.FileDescriptor
+
+const file_proto_kad_proto_rawDesc = "" +
 	"\n" +
-	"\tkad.proto\x12\x03kad\">\n" +
+	"\x0fproto/kad.proto\x12\x03kad\">\n" +
 	"\x04Node\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04host\x18\x02 \x01(\tR\x04host\x12\x12\n" +
@@ -393,25 +513,34 @@ const file_kad_proto_rawDesc = "" +
 	"\x0eGetNodeListReq\x12!\n" +
 	"\frequester_id\x18\x01 \x01(\tR\vrequesterId\"1\n" +
 	"\x0eGetNodeListRes\x12\x1f\n" +
-	"\x05nodes\x18\x01 \x03(\v2\t.kad.NodeR\x05nodes2j\n" +
+	"\x05nodes\x18\x01 \x03(\v2\t.kad.NodeR\x05nodes\"C\n" +
+	"\fLookupNFTReq\x12\x17\n" +
+	"\afrom_id\x18\x01 \x01(\tR\x06fromId\x12\x1a\n" +
+	"\x03key\x18\x02 \x01(\v2\b.kad.KeyR\x03key\"\x91\x01\n" +
+	"\fLookupNFTRes\x12\x14\n" +
+	"\x05found\x18\x01 \x01(\bR\x05found\x12!\n" +
+	"\x06holder\x18\x02 \x01(\v2\t.kad.NodeR\x06holder\x12#\n" +
+	"\x05value\x18\x03 \x01(\v2\r.kad.NFTValueR\x05value\x12#\n" +
+	"\anearest\x18\x04 \x03(\v2\t.kad.NodeR\anearest2\x9d\x01\n" +
 	"\bKademlia\x12%\n" +
 	"\x05Store\x12\r.kad.StoreReq\x1a\r.kad.StoreRes\x127\n" +
-	"\vGetNodeList\x12\x13.kad.GetNodeListReq\x1a\x13.kad.GetNodeListResB\x0fZ\rproto/kad;kadb\x06proto3"
+	"\vGetNodeList\x12\x13.kad.GetNodeListReq\x1a\x13.kad.GetNodeListRes\x121\n" +
+	"\tLookupNFT\x12\x11.kad.LookupNFTReq\x1a\x11.kad.LookupNFTResB\x0fZ\rproto/kad;kadb\x06proto3"
 
 var (
-	file_kad_proto_rawDescOnce sync.Once
-	file_kad_proto_rawDescData []byte
+	file_proto_kad_proto_rawDescOnce sync.Once
+	file_proto_kad_proto_rawDescData []byte
 )
 
-func file_kad_proto_rawDescGZIP() []byte {
-	file_kad_proto_rawDescOnce.Do(func() {
-		file_kad_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_kad_proto_rawDesc), len(file_kad_proto_rawDesc)))
+func file_proto_kad_proto_rawDescGZIP() []byte {
+	file_proto_kad_proto_rawDescOnce.Do(func() {
+		file_proto_kad_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_kad_proto_rawDesc), len(file_proto_kad_proto_rawDesc)))
 	})
-	return file_kad_proto_rawDescData
+	return file_proto_kad_proto_rawDescData
 }
 
-var file_kad_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
-var file_kad_proto_goTypes = []any{
+var file_proto_kad_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_proto_kad_proto_goTypes = []any{
 	(*Node)(nil),           // 0: kad.Node
 	(*Key)(nil),            // 1: kad.Key
 	(*NFTValue)(nil),       // 2: kad.NFTValue
@@ -419,43 +548,51 @@ var file_kad_proto_goTypes = []any{
 	(*StoreRes)(nil),       // 4: kad.StoreRes
 	(*GetNodeListReq)(nil), // 5: kad.GetNodeListReq
 	(*GetNodeListRes)(nil), // 6: kad.GetNodeListRes
+	(*LookupNFTReq)(nil),   // 7: kad.LookupNFTReq
+	(*LookupNFTRes)(nil),   // 8: kad.LookupNFTRes
 }
-var file_kad_proto_depIdxs = []int32{
-	0, // 0: kad.StoreReq.from:type_name -> kad.Node
-	1, // 1: kad.StoreReq.key:type_name -> kad.Key
-	2, // 2: kad.StoreReq.value:type_name -> kad.NFTValue
-	0, // 3: kad.GetNodeListRes.nodes:type_name -> kad.Node
-	3, // 4: kad.Kademlia.Store:input_type -> kad.StoreReq
-	5, // 5: kad.Kademlia.GetNodeList:input_type -> kad.GetNodeListReq
-	4, // 6: kad.Kademlia.Store:output_type -> kad.StoreRes
-	6, // 7: kad.Kademlia.GetNodeList:output_type -> kad.GetNodeListRes
-	6, // [6:8] is the sub-list for method output_type
-	4, // [4:6] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+var file_proto_kad_proto_depIdxs = []int32{
+	0,  // 0: kad.StoreReq.from:type_name -> kad.Node
+	1,  // 1: kad.StoreReq.key:type_name -> kad.Key
+	2,  // 2: kad.StoreReq.value:type_name -> kad.NFTValue
+	0,  // 3: kad.GetNodeListRes.nodes:type_name -> kad.Node
+	1,  // 4: kad.LookupNFTReq.key:type_name -> kad.Key
+	0,  // 5: kad.LookupNFTRes.holder:type_name -> kad.Node
+	2,  // 6: kad.LookupNFTRes.value:type_name -> kad.NFTValue
+	0,  // 7: kad.LookupNFTRes.nearest:type_name -> kad.Node
+	3,  // 8: kad.Kademlia.Store:input_type -> kad.StoreReq
+	5,  // 9: kad.Kademlia.GetNodeList:input_type -> kad.GetNodeListReq
+	7,  // 10: kad.Kademlia.LookupNFT:input_type -> kad.LookupNFTReq
+	4,  // 11: kad.Kademlia.Store:output_type -> kad.StoreRes
+	6,  // 12: kad.Kademlia.GetNodeList:output_type -> kad.GetNodeListRes
+	8,  // 13: kad.Kademlia.LookupNFT:output_type -> kad.LookupNFTRes
+	11, // [11:14] is the sub-list for method output_type
+	8,  // [8:11] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
-func init() { file_kad_proto_init() }
-func file_kad_proto_init() {
-	if File_kad_proto != nil {
+func init() { file_proto_kad_proto_init() }
+func file_proto_kad_proto_init() {
+	if File_proto_kad_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_kad_proto_rawDesc), len(file_kad_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_kad_proto_rawDesc), len(file_proto_kad_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_kad_proto_goTypes,
-		DependencyIndexes: file_kad_proto_depIdxs,
-		MessageInfos:      file_kad_proto_msgTypes,
+		GoTypes:           file_proto_kad_proto_goTypes,
+		DependencyIndexes: file_proto_kad_proto_depIdxs,
+		MessageInfos:      file_proto_kad_proto_msgTypes,
 	}.Build()
-	File_kad_proto = out.File
-	file_kad_proto_goTypes = nil
-	file_kad_proto_depIdxs = nil
+	File_proto_kad_proto = out.File
+	file_proto_kad_proto_goTypes = nil
+	file_proto_kad_proto_depIdxs = nil
 }

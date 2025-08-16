@@ -41,7 +41,7 @@ func readCsv(path string) []string {
 	}
 
 	col1 := make([]string, 0, len(records))
-	for i := 1; i < len(records); i++ { // <-- parte da 1
+	for i := 0; i < len(records); i++ { // <-- parte da 0
 		row := records[i]
 		if len(row) < 2 {
 			fmt.Printf("Riga %d ha meno di 2 colonne\n", i)
@@ -171,7 +171,7 @@ func StoreNFTToNodes(nft NFT, tokenID string, name string, nodes []string, ttlSe
 
 	// payload (serializzazione minimale dell'NFT)
 	payload, _ := json.Marshal(struct {
-		TokenID string `json:"token_id"`
+		TokenID []byte `json:"token_id"`
 		Name    string `json:"name"`
 
 		Index string `json:"index,omitempty"`
@@ -192,7 +192,7 @@ func StoreNFTToNodes(nft NFT, tokenID string, name string, nodes []string, ttlSe
 		Website           string `json:"website,omitempty"`
 		Logo              string `json:"logo,omitempty"`
 	}{
-		TokenID:           tokenID,
+		TokenID:           key,
 		Name:              name,
 		Index:             nft.Index,
 		Volume:            nft.Volume,

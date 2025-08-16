@@ -35,10 +35,16 @@ type NFT struct {
 
 func main() {
 
-	var listNFT []string
-	var listNFTId [][]byte
-
 	var csvAll [][]string
+
+	go func() {
+		if err := runGRPCServer(); err != nil {
+			log.Printf("gRPC server chiuso: %v", err)
+		}
+	}()
+
+	// opzionale: piccolo delay per dare tempo al listener di alzarsi
+	time.Sleep(400 * time.Millisecond)
 
 	// Prende l'ID del nodo dall'ambiente
 	nodeID := os.Getenv("NODE_ID")
@@ -46,33 +52,34 @@ func main() {
 		nodeID = "default"
 	}
 
-	fmt.Println("Avviato nodo:", nodeID, "PID:", os.Getpid())
+	fmt.Println("Avviato nodo:", nodeID)
 
 	isSeeder := os.Getenv("SEED") == "true"
 
 	if isSeeder {
 
-		go func() {
-			if err := runGRPCServer(); err != nil {
-				log.Fatalf("gRPC server error (seeder): %v", err)
-			}
-		}()
-
-		time.Sleep(300 * time.Millisecond)
-
 		fmt.Printf("sono il seeder,\nReading CSV file...\n")
 
-		listNFT = readCsv("csv/NFT_Top_Collections.csv")
 		csvAll = readCsv2("csv/NFT_Top_Collections.csv")
 
-		fmt.Printf("NFT letti: %d\n", len(listNFT))
+		fmt.Printf("NFT letti: %d\n", len(csvAll))
 
 		// Genera gli ID per la lista di NFT
 		fmt.Printf("Generating IDs for NFTs...\n")
 
-		listNFTId = generateBytesOfAllNfts(listNFT)
+		var colName []string
+		for i, row := range csvAll {
+			if i == 0 {
+				continue // salta intestazione se presente
+			}
+			colName = append(colName, row[1])
+		}
 
-		fmt.Printf("NFT id %x: NFT String: %s\n", listNFTId[0], DecodeID(listNFTId[0]))
+		fmt.Printf("NFT 0z %s\n", colName[0])
+
+		listNFTId := generateBytesOfAllNfts(colName)
+
+		fmt.Printf("NFT id %x: NFT name: %s\n", listNFTId[0], DecodeID(listNFTId[0]))
 
 		// recuper gli ID dei container
 		rawNodes := os.Getenv("NODES")
@@ -93,10 +100,16 @@ func main() {
 
 		fmt.Println("Assegnazione dei k nodeID più vicini agli NFT...")
 
-		nfts := make([]NFT, len(listNFTId))
-		for i := 0; i < len(listNFTId); i++ {
-			row := csvAll[i]
-			// accessor sicuro per colonne mancanti
+		rows := csvAll[1:] // salta header
+		nfts := make([]NFT, 0, len(rows))
+		for _, row := range rows {
+			if len(row) < 17 {
+				continue
+			} // safety
+
+			name := strings.TrimSpace(row[1])
+			key := NewIDFromToken(name, 20) // ID dal Name (come vuoi tu)
+
 			col := func(k int) string {
 				if k >= 0 && k < len(row) {
 					return strings.TrimSpace(row[k])
@@ -104,10 +117,9 @@ func main() {
 				return ""
 			}
 
-			nfts[i] = NFT{
-				// campi CSV
+			nfts = append(nfts, NFT{
 				Index:             col(0),
-				Name:              col(1),
+				Name:              name,
 				Volume:            col(2),
 				Volume_USD:        col(3),
 				Market_Cap:        col(4),
@@ -124,27 +136,10 @@ func main() {
 				Website:           col(15),
 				Logo:              col(16),
 
-				// campi interni
-				TokenID:            listNFTId[i],
-				AssignedNodesToken: AssignNFTToNodes(listNFTId[i], iDnew, 2),
-			}
+				TokenID:            key,
+				AssignedNodesToken: AssignNFTToNodes(key, iDnew, 2),
+			})
 		}
-
-		/*
-
-			nfts := make([]NFT, len(listNFTId))
-			for i = 0; i < len(listNFTId); i++ {
-				//fmt.Printf("Assegnazione NFT %x\n", listNFTId[i])
-				nfts[i] = NFT{
-					TokenID:            listNFTId[i],
-					AssignedNodesToken: AssignNFTToNodes(listNFTId[i], iDnew, 2),
-				}
-
-			}
-		*/
-
-		// Lista esplicita dei nodi da controllare
-		//targets := []string{"node7", "node9"}
 
 		for _, h := range parts {
 			if err := waitReady(h, 12*time.Second); err != nil {
@@ -152,12 +147,7 @@ func main() {
 			}
 		}
 
-		fmt.Printf("NFT %d: %x,%s,%s\n", 0, nfts[1].TokenID, DecodeID(nfts[1].TokenID), nfts[1].Volume_USD)                              // ID del primo NFT
-		fmt.Printf("Assigned bytes Nodes %d: %x, nodo id: %s\n", 1, nfts[1].AssignedNodesToken, DecodeID(nfts[1].AssignedNodesToken[0])) // [NodeID1 NodeID2]
-
 		//-------------Salvatggio degli NFT sugli appositi Nodi-------------------------------------------------------------------//
-
-		fmt.Println("Salvataggio degli NFT assegnati ai nodi...")
 
 		fmt.Printf("struct size: %d\n", len(nfts))
 
@@ -177,12 +167,16 @@ func main() {
 
 		}
 
+		select {} // blocca per sempre
+
 	} else {
 
 		var nodes []string
 		var TokenNodo []byte
 		var Bucket [][]byte
 		var BucketSort [][]byte
+
+		//-------------------I container si mettono in ascolto qui-------------------//
 
 		nodeID := os.Getenv("NODE_ID")
 		if nodeID == "" {
@@ -219,10 +213,7 @@ func main() {
 			log.Fatalf("Errore salvataggio K-bucket: %v", err)
 		}
 
-		//-------------------I container si mettono in ascolto qui-------------------//
-		if err := runGRPCServer(); err != nil {
-			log.Fatal(err)
-		}
+		select {} // blocca per sempre
 
 	}
 

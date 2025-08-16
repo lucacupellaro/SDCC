@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v3.21.12
-// source: kad.proto
+// source: proto/kad.proto
 
 package kad
 
@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	Kademlia_Store_FullMethodName       = "/kad.Kademlia/Store"
 	Kademlia_GetNodeList_FullMethodName = "/kad.Kademlia/GetNodeList"
+	Kademlia_LookupNFT_FullMethodName   = "/kad.Kademlia/LookupNFT"
 )
 
 // KademliaClient is the client API for Kademlia service.
@@ -31,6 +32,7 @@ const (
 type KademliaClient interface {
 	Store(ctx context.Context, in *StoreReq, opts ...grpc.CallOption) (*StoreRes, error)
 	GetNodeList(ctx context.Context, in *GetNodeListReq, opts ...grpc.CallOption) (*GetNodeListRes, error)
+	LookupNFT(ctx context.Context, in *LookupNFTReq, opts ...grpc.CallOption) (*LookupNFTRes, error)
 }
 
 type kademliaClient struct {
@@ -61,6 +63,16 @@ func (c *kademliaClient) GetNodeList(ctx context.Context, in *GetNodeListReq, op
 	return out, nil
 }
 
+func (c *kademliaClient) LookupNFT(ctx context.Context, in *LookupNFTReq, opts ...grpc.CallOption) (*LookupNFTRes, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(LookupNFTRes)
+	err := c.cc.Invoke(ctx, Kademlia_LookupNFT_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // KademliaServer is the server API for Kademlia service.
 // All implementations must embed UnimplementedKademliaServer
 // for forward compatibility.
@@ -69,6 +81,7 @@ func (c *kademliaClient) GetNodeList(ctx context.Context, in *GetNodeListReq, op
 type KademliaServer interface {
 	Store(context.Context, *StoreReq) (*StoreRes, error)
 	GetNodeList(context.Context, *GetNodeListReq) (*GetNodeListRes, error)
+	LookupNFT(context.Context, *LookupNFTReq) (*LookupNFTRes, error)
 	mustEmbedUnimplementedKademliaServer()
 }
 
@@ -84,6 +97,9 @@ func (UnimplementedKademliaServer) Store(context.Context, *StoreReq) (*StoreRes,
 }
 func (UnimplementedKademliaServer) GetNodeList(context.Context, *GetNodeListReq) (*GetNodeListRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetNodeList not implemented")
+}
+func (UnimplementedKademliaServer) LookupNFT(context.Context, *LookupNFTReq) (*LookupNFTRes, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method LookupNFT not implemented")
 }
 func (UnimplementedKademliaServer) mustEmbedUnimplementedKademliaServer() {}
 func (UnimplementedKademliaServer) testEmbeddedByValue()                  {}
@@ -142,6 +158,24 @@ func _Kademlia_GetNodeList_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Kademlia_LookupNFT_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LookupNFTReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(KademliaServer).LookupNFT(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Kademlia_LookupNFT_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(KademliaServer).LookupNFT(ctx, req.(*LookupNFTReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Kademlia_ServiceDesc is the grpc.ServiceDesc for Kademlia service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -157,7 +191,11 @@ var Kademlia_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "GetNodeList",
 			Handler:    _Kademlia_GetNodeList_Handler,
 		},
+		{
+			MethodName: "LookupNFT",
+			Handler:    _Kademlia_LookupNFT_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "kad.proto",
+	Metadata: "proto/kad.proto",
 }

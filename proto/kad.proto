@@ -33,10 +33,23 @@ message GetNodeListRes {
   repeated Node nodes = 1;  // qui specifichi che è una lista di Node
 }
 
+message LookupNFTReq {
+  string from_id = 1;  // id del nodo che fa la richiesta (per logging)
+  Key    key     = 2;  // chiave NFT (20 byte come fai tu)
+}
+
+message LookupNFTRes {
+  bool           found   = 1;           // true se presente su questo nodo
+  Node           holder  = 2;           // questo nodo (se found=true)
+  NFTValue       value   = 3;           // il contenuto (json bytes) se found=true
+  repeated Node  nearest = 4;           // suggerimento nodi più vicini se non trovato
+}
+
 
 // ---- Servizio ----
 service Kademlia {
   rpc Store (StoreReq) returns (StoreRes);
   rpc GetNodeList (GetNodeListReq) returns (GetNodeListRes);
+  rpc LookupNFT   (LookupNFTReq)   returns (LookupNFTRes);
 
 }
