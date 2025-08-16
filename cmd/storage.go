@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/csv"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -171,7 +172,7 @@ func StoreNFTToNodes(nft NFT, tokenID string, name string, nodes []string, ttlSe
 
 	// payload (serializzazione minimale dell'NFT)
 	payload, _ := json.Marshal(struct {
-		TokenID []byte `json:"token_id"`
+		TokenID string `json:"token_id"`
 		Name    string `json:"name"`
 
 		Index string `json:"index,omitempty"`
@@ -192,7 +193,7 @@ func StoreNFTToNodes(nft NFT, tokenID string, name string, nodes []string, ttlSe
 		Website           string `json:"website,omitempty"`
 		Logo              string `json:"logo,omitempty"`
 	}{
-		TokenID:           key,
+		TokenID:           hex.EncodeToString(key),
 		Name:              name,
 		Index:             nft.Index,
 		Volume:            nft.Volume,
