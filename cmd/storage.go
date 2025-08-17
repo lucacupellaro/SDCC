@@ -332,3 +332,112 @@ func ListNodeVolumeFiles(nodeID string) ([]string, error) {
 	sort.Strings(files)
 	return files, nil
 }
+
+func hexFileNameFromName(nameBytes []byte) string {
+	// pad/truncate a 20 byte e poi hex
+	fixed := make([]byte, 20)
+	copy(fixed, nameBytes) // se nameBytes >20 viene troncato, se <20 viene padded con 0x00
+	return fmt.Sprintf("%x.json", fixed)
+}
+
+/*
+	func (s *KademliaServer) LookupNFT(ctx context.Context, req *pb.LookupNFTReq) (*pb.LookupNFTRes, error) {
+		dataDir := strings.TrimSpace(os.Getenv("DATA_DIR"))
+		if dataDir == "" {
+			dataDir = "/data"
+		}
+
+		// Qui ci aspettiamo che il client passi il NOME in chiaro (es. "Kreechures")
+		nameRaw := req.GetKey().GetKey()
+		fileName := hexFileNameFromName(nameRaw)
+		filePath := filepath.Join(dataDir, fileName)
+
+		log.Printf("[SERVER %s] LookupNFT: name='%s' → file='%s'",
+			os.Getenv("NODE_ID"), string(nameRaw), fileName)
+
+		// Prova a leggere il file
+		b, err := os.ReadFile(filePath)
+		if err == nil {
+			log.Printf("[SERVER %s] TROVATO %s", os.Getenv("NODE_ID"), fileName)
+			return &pb.LookupNFTRes{
+				Found: true,
+				Holder: &pb.Node{
+					Id:   os.Getenv("NODE_ID"),
+					Host: os.Getenv("NODE_ID"),
+					Port: 8000,
+				},
+				Value:   &pb.NFTValue{Bytes: b}, // il contenuto JSON
+				Nearest: nil,
+			}, nil
+		}
+
+		log.Printf("[SERVER %s] NON trovato: %s (err=%v)", os.Getenv("NODE_ID"), fileName, err)
+		// In questa versione "semplice" non ritorniamo vicini: singolo nodo.
+
+
+		return &pb.LookupNFTRes{Found: false}, nil
+	}
+*/
+func (s *KademliaServer) LookupNFT(ctx context.Context, req *pb.LookupNFTReq) (*pb.LookupNFTRes, error) {
+	dataDir := strings.TrimSpace(os.Getenv("DATA_DIR"))
+	if dataDir == "" {
+		dataDir = "/data"
+	}
+
+	// Costruzione nome file NFT
+	nameRaw := req.GetKey().GetKey()
+	fileName := hexFileNameFromName(nameRaw)
+	filePath := filepath.Join(dataDir, fileName)
+
+	log.Printf("[SERVER %s] LookupNFT: name='%s' → file='%s'",
+		os.Getenv("NODE_ID"), string(nameRaw), fileName)
+
+	// --- Prova NFT ---
+	b, err := os.ReadFile(filePath)
+	if err == nil {
+		log.Printf("[SERVER %s] TROVATO %s", os.Getenv("NODE_ID"), fileName)
+		return &pb.LookupNFTRes{
+			Found: true,
+			Holder: &pb.Node{
+				Id:   os.Getenv("NODE_ID"),
+				Host: os.Getenv("NODE_ID"),
+				Port: 8000,
+			},
+			Value: &pb.NFTValue{Bytes: b},
+		}, nil
+	}
+
+	// --- Se non trovato, prova kbucket.json ---
+	log.Printf("[SERVER %s] NON trovato: %s (err=%v)", os.Getenv("NODE_ID"), fileName, err)
+
+	kbPath := filepath.Join(dataDir, "kbucket.json")
+	kbBytes, err2 := os.ReadFile(kbPath)
+	if err2 != nil {
+		log.Printf("[SERVER %s] Nessun kbucket.json disponibile (err=%v)", os.Getenv("NODE_ID"), err2)
+		return &pb.LookupNFTRes{Found: false}, nil
+	}
+
+	var parsed struct {
+		NodeID    string   `json:"node_id"`
+		BucketHex []string `json:"bucket_hex"`
+		SavedAt   string   `json:"saved_at"`
+	}
+	if err := json.Unmarshal(kbBytes, &parsed); err != nil {
+		log.Printf("[SERVER %s] Errore parse kbucket.json: %v", os.Getenv("NODE_ID"), err)
+		return &pb.LookupNFTRes{Found: false}, nil
+	}
+
+	var nearest []*pb.Node
+	for _, hexStr := range parsed.BucketHex {
+		idBytes, _ := hex.DecodeString(hexStr)
+		idStr := string(bytes.TrimRight(idBytes, "\x00"))
+		nearest = append(nearest, &pb.Node{
+			Id:   idStr,
+			Host: idStr,
+			Port: 8000,
+		})
+	}
+
+	log.Printf("[SERVER %s] Ritorno %d nodi vicini dal kbucket", os.Getenv("NODE_ID"), len(nearest))
+	return &pb.LookupNFTRes{Found: false, Nearest: nearest}, nil
+}

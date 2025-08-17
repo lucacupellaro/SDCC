@@ -4,14 +4,11 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	pb "kademlia-nft/proto/kad"
+	"math/big"
 	"os"
 	"os/exec"
-	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
@@ -116,132 +113,6 @@ func dedupe(in []string) []string {
 	return out
 }
 
-func LookupNFTClient(startNodeHostPort string, key []byte, maxHops int) (*pb.LookupNFTRes, error) {
-	visited := make(map[string]bool)
-	toVisit := []string{startNodeHostPort}
-
-	for hops := 0; hops < maxHops && len(toVisit) > 0; hops++ {
-		current := toVisit[0]
-		toVisit = toVisit[1:]
-
-		if visited[current] {
-			continue
-		}
-		visited[current] = true
-
-		// gRPC call
-		conn, err := grpc.Dial(current, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		if err != nil {
-			continue // prova gli altri
-		}
-		client := pb.NewKademliaClient(conn)
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		resp, err := client.LookupNFT(ctx, &pb.LookupNFTReq{
-			FromId: os.Getenv("NODE_ID"),
-			Key:    &pb.Key{Key: key},
-		})
-		cancel()
-		_ = conn.Close()
-
-		if err != nil {
-			continue // prova gli altri
-		}
-
-		if resp.GetFound() {
-			return resp, nil // trovato!
-		}
-
-		// Aggiungo i suggeriti (nearest) in coda
-		for _, n := range resp.GetNearest() {
-			addr := fmt.Sprintf("%s:%d", n.Host, n.Port) // es. "node7:8000"
-			if !visited[addr] {
-				toVisit = append(toVisit, addr)
-			}
-		}
-	}
-
-	return nil, fmt.Errorf("NFT non trovato (hops=%d)", maxHops)
-}
-
-// dentro lo stesso file dove hai type KademliaServer {...}
-
-func (s *KademliaServer) LookupNFT(ctx context.Context, req *pb.LookupNFTReq) (*pb.LookupNFTRes, error) {
-	// 1) cerco localmente
-	dataDir := strings.TrimSpace(os.Getenv("DATA_DIR"))
-	if dataDir == "" {
-		dataDir = "/data"
-	}
-
-	fileName := fmt.Sprintf("%x.json", req.Key.Key)
-	fmt.Printf("stiamo cercando il file%s\n", fileName)
-	filePath := filepath.Join(dataDir, fileName)
-
-	if b, err := os.ReadFile(filePath); err == nil {
-		// trovato localmente
-		return &pb.LookupNFTRes{
-			Found:  true,
-			Holder: &pb.Node{Id: os.Getenv("NODE_ID"), Host: os.Getenv("NODE_ID"), Port: 8000},
-			Value:  &pb.NFTValue{Bytes: b},
-			// nearest vuoto se trovato
-		}, nil
-	}
-
-	// 2) non trovato: restituisco i vicini dal kbucket, ordinati per distanza dalla chiave
-	//    - leggo /data/kbucket.json
-	type KBucketFile struct {
-		NodeID    string   `json:"node_id"`
-		BucketHex []string `json:"bucket_hex"`
-		SavedAt   string   `json:"saved_at"`
-	}
-	kbPath := filepath.Join(dataDir, "kbucket.json")
-	kbBytes, err := os.ReadFile(kbPath)
-	if err != nil {
-		// non ho kbucket -> non posso suggerire vicini
-		return &pb.LookupNFTRes{Found: false}, nil
-	}
-	var kb KBucketFile
-	if err := json.Unmarshal(kbBytes, &kb); err != nil {
-		return &pb.LookupNFTRes{Found: false}, nil
-	}
-
-	// decodifico gli ID in []byte
-	var bucket [][]byte
-	for _, hx := range kb.BucketHex {
-		b, decErr := hex.DecodeString(hx)
-		if decErr == nil {
-			bucket = append(bucket, b)
-		}
-	}
-
-	// ordino i bucket per distanza XOR dalla chiave
-	// NB: usa le tue funzioni XOR/LessThan già presenti
-	type pair struct {
-		id   []byte
-		dist []byte
-	}
-	pairs := make([]pair, 0, len(bucket))
-	for _, nid := range bucket {
-		pairs = append(pairs, pair{id: nid, dist: XOR(req.Key.Key, nid)})
-	}
-	sort.Slice(pairs, func(i, j int) bool { return LessThan(pairs[i].dist, pairs[j].dist) })
-
-	// prendo i primi N (es. 3–7) e li trasformo in pb.Node
-	N := 5
-	if N > len(pairs) {
-		N = len(pairs)
-	}
-	nearest := make([]*pb.Node, 0, N)
-	for i := 0; i < N; i++ {
-		host := DecodeID(pairs[i].id) // es. "node7"
-		nearest = append(nearest, &pb.Node{Id: host, Host: host, Port: 8000})
-	}
-
-	return &pb.LookupNFTRes{
-		Found:   false,
-		Nearest: nearest,
-	}, nil
-}
-
 func NewIDFromToken(tokenID string, size int) []byte {
 	b := []byte(tokenID)
 	if len(b) > size {
@@ -287,4 +158,176 @@ func LessThan(a, b []byte) bool {
 	}
 	// se prefissi uguali, quello più corto è “minore”
 	return len(a) < len(b)
+}
+
+func resolveStartHostPort(name string) (string, error) {
+	name = strings.TrimSpace(strings.ToLower(name))
+	// supporta sia "node3" sia "nodo3"
+	if strings.HasPrefix(name, "nodo") {
+		name = "node" + name[len("nodo"):]
+	}
+	var n int
+	if _, err := fmt.Sscanf(name, "node%d", &n); err != nil || n < 1 || n > 11 {
+		return "", fmt.Errorf("nome nodo non valido: %q", name)
+	}
+	// La CLI corre su HOST → usa la porta mappata localhost:800N
+	return fmt.Sprintf("localhost:%d", 8000+n), nil
+}
+
+/*
+	func LookupNFTOnNodeByName(nodeName, nftName string) error {
+		hostPort, err := resolveStartHostPort(nodeName)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("🔎 Cerco '%s' su %s\n", nftName, hostPort)
+
+		// inviamo il NOME in chiaro: il server farà pad+hex per costruire <id>.json
+		key := []byte(nftName)
+
+		conn, err := grpc.Dial(hostPort, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			return fmt.Errorf("dial fallito %s: %w", hostPort, err)
+		}
+		defer conn.Close()
+
+		client := pb.NewKademliaClient(conn)
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		resp, err := client.LookupNFT(ctx, &pb.LookupNFTReq{
+			FromId: "CLI",
+			Key:    &pb.Key{Key: key},
+		})
+		if err != nil {
+			return fmt.Errorf("RPC fallita: %w", err)
+		}
+
+		if !resp.GetFound() {
+			fmt.Println("✖ NFT non trovato su questo nodo")
+			return nil
+		}
+
+		// Stampa il contenuto JSON
+		fmt.Printf("✓ Trovato su nodo %s\n", resp.GetHolder().GetId())
+		fmt.Printf("Contenuto JSON:\n%s\n", string(resp.GetValue().GetBytes()))
+		return nil
+	}
+*/
+func LookupNFTOnNodeByName(startNode, nftName string, maxHops int) error {
+	if maxHops <= 0 {
+		maxHops = 15
+	}
+
+	nftID20 := NewIDFromToken(nftName, 20)
+	visited := make(map[string]bool)
+	current := startNode
+
+	for hop := 0; hop < maxHops; hop++ {
+		if visited[current] {
+			// già visto: non ha senso riprovarlo
+			break
+		}
+		visited[current] = true
+
+		hostPort, err := resolveStartHostPort(current)
+		if err != nil {
+			return fmt.Errorf("risoluzione %q fallita: %w", current, err)
+		}
+
+		fmt.Printf("🔎 Hop %d: cerco '%s' su %s (%s)\n", hop+1, nftName, current, hostPort)
+
+		conn, err := grpc.Dial(hostPort, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			return fmt.Errorf("dial fallito %s: %w", hostPort, err)
+		}
+		client := pb.NewKademliaClient(conn)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		resp, rpcErr := client.LookupNFT(ctx, &pb.LookupNFTReq{
+			FromId: "CLI",
+			Key:    &pb.Key{Key: []byte(nftName)}, // nome in chiaro; il server fa pad+hex
+		})
+		cancel()
+		_ = conn.Close()
+
+		if rpcErr != nil {
+			return fmt.Errorf("RPC fallita su %s: %w", current, rpcErr)
+		}
+
+		if resp.GetFound() {
+			fmt.Printf("✅ Trovato su nodo %s\n", resp.GetHolder().GetId())
+			fmt.Printf("Contenuto JSON:\n%s\n", string(resp.GetValue().GetBytes()))
+			return nil
+		}
+
+		nearest := resp.GetNearest()
+		if len(nearest) == 0 {
+			fmt.Println("✖ NFT non trovato e nessun nodo vicino restituito — arresto.")
+			return nil
+		}
+
+		// Estrai gli ID utili e filtra già i visitati
+		candidates := make([]string, 0, len(nearest))
+		fmt.Println("… nodi vicini suggeriti:")
+		for _, n := range nearest {
+			id := n.GetId()
+			if id == "" {
+				id = n.GetHost()
+			}
+			if id == "" {
+				continue
+			}
+			fmt.Printf("   - %s (%s:%d)\n", id, n.GetHost(), n.GetPort())
+			if !visited[id] {
+				candidates = append(candidates, id)
+			}
+		}
+
+		if len(candidates) == 0 {
+			fmt.Println("✖ Nessun vicino non visitato disponibile — arresto.")
+			return nil
+		}
+
+		best, err := sceltaNodoPiuVicino(nftID20, candidates)
+		if err != nil {
+			fmt.Printf("⚠️  Impossibile scegliere il nodo più vicino: %v — prendo il primo candidato.\n", err)
+			best = candidates[0]
+		}
+
+		fmt.Printf("➡️  Prossimo nodo scelto: %s\n", best)
+		current = best
+	}
+
+	fmt.Printf("⛔ Max hop (%d) raggiunto senza trovare '%s'.\n", maxHops, nftName)
+	return nil
+}
+
+// sceltaNodoPiuVicino: XOR distance minima tra nftID20 e ogni nodo (ID a 20 byte).
+func sceltaNodoPiuVicino(nftID20 []byte, nodiVicini []string) (string, error) {
+	var bestNode string
+	var bestDist *big.Int
+
+	for _, idStr := range nodiVicini {
+		// Ricostruisco l'ID a 20 byte come fai ovunque (NewIDFromToken)
+		nidBytes := NewIDFromToken(idStr, 20)
+
+		// XOR byte-wise
+		distBytes := make([]byte, len(nftID20))
+		for i := range nftID20 {
+			distBytes[i] = nftID20[i] ^ nidBytes[i]
+		}
+
+		distInt := new(big.Int).SetBytes(distBytes)
+		if bestDist == nil || distInt.Cmp(bestDist) < 0 {
+			bestDist = distInt
+			bestNode = idStr
+		}
+	}
+
+	if bestNode == "" {
+		return "", fmt.Errorf("nessun nodo valido trovato")
+	}
+	return bestNode, nil
 }
