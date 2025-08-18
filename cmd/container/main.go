@@ -2,43 +2,19 @@ package main
 
 import (
 	"fmt"
+	"kademlia-nft/logica"
 	"log"
 	"os"
 	"strings"
 	"time"
 )
 
-type NFT struct {
-	// colonne CSV
-	Index             string
-	Name              string
-	Volume            string
-	Volume_USD        string
-	Market_Cap        string
-	Market_Cap_USD    string
-	Sales             string
-	Floor_Price       string
-	Floor_Price_USD   string
-	Average_Price     string
-	Average_Price_USD string
-	Owners            string
-	Assets            string
-	Owner_Asset_Ratio string
-	Category          string
-	Website           string
-	Logo              string
-
-	// campi interni al tuo sistema
-	TokenID            []byte
-	AssignedNodesToken [][]byte
-}
-
 func main() {
 
 	var csvAll [][]string
 
 	go func() {
-		if err := runGRPCServer(); err != nil {
+		if err := logica.RunGRPCServer(); err != nil {
 			log.Printf("gRPC server chiuso: %v", err)
 		}
 	}()
@@ -60,7 +36,7 @@ func main() {
 
 		fmt.Printf("sono il seeder,\nReading CSV file...\n")
 
-		csvAll = readCsv2("csv/NFT_Top_Collections.csv")
+		csvAll = logica.ReadCsv2("csv/NFT_Top_Collections.csv")
 
 		fmt.Printf("NFT letti: %d\n", len(csvAll))
 
@@ -77,9 +53,9 @@ func main() {
 
 		fmt.Printf("NFT 0z %s\n", colName[0])
 
-		listNFTId := generateBytesOfAllNfts(colName)
+		listNFTId := logica.GenerateBytesOfAllNfts(colName)
 
-		fmt.Printf("NFT id %x: NFT name: %s\n", listNFTId[0], DecodeID(listNFTId[0]))
+		fmt.Printf("NFT id %x: NFT name: %s\n", listNFTId[0], logica.DecodeID(listNFTId[0]))
 
 		// recuper gli ID dei container
 		rawNodes := os.Getenv("NODES")
@@ -92,7 +68,7 @@ func main() {
 		iDnew := make([][]byte, len(parts))
 		for i, p := range parts {
 			//fmt.Println("Nodo trovato:", p)
-			iDnew[i] = NewIDFromToken(p, 20)
+			iDnew[i] = logica.NewIDFromToken(p, 20)
 
 		}
 
@@ -101,14 +77,14 @@ func main() {
 		fmt.Println("Assegnazione dei k nodeID più vicini agli NFT...")
 
 		rows := csvAll[1:] // salta header
-		nfts := make([]NFT, 0, len(rows))
+		nfts := make([]logica.NFT, 0, len(rows))
 		for _, row := range rows {
 			if len(row) < 17 {
 				continue
 			} // safety
 
 			name := strings.TrimSpace(row[1])
-			key := NewIDFromToken(name, 20) // ID dal Name (come vuoi tu)
+			key := logica.NewIDFromToken(name, 20) // ID dal Name (come vuoi tu)
 
 			col := func(k int) string {
 				if k >= 0 && k < len(row) {
@@ -117,7 +93,7 @@ func main() {
 				return ""
 			}
 
-			nfts = append(nfts, NFT{
+			nfts = append(nfts, logica.NFT{
 				Index:             col(0),
 				Name:              name,
 				Volume:            col(2),
@@ -137,12 +113,12 @@ func main() {
 				Logo:              col(16),
 
 				TokenID:            key,
-				AssignedNodesToken: AssignNFTToNodes(key, iDnew, 2),
+				AssignedNodesToken: logica.AssignNFTToNodes(key, iDnew, 2),
 			})
 		}
 
 		for _, h := range parts {
-			if err := waitReady(h, 12*time.Second); err != nil {
+			if err := logica.WaitReady(h, 12*time.Second); err != nil {
 				log.Fatalf("❌ Nodo %s non pronto: %v", h, err) // fermati se uno non è pronto
 			}
 		}
@@ -153,10 +129,10 @@ func main() {
 
 		for j := 0; j < len(nfts); j++ {
 			var nodi []string
-			nodi = append(nodi, DecodeID(nfts[j].AssignedNodesToken[0]))
-			nodi = append(nodi, DecodeID(nfts[j].AssignedNodesToken[1]))
+			nodi = append(nodi, logica.DecodeID(nfts[j].AssignedNodesToken[0]))
+			nodi = append(nodi, logica.DecodeID(nfts[j].AssignedNodesToken[1]))
 
-			if err := StoreNFTToNodes(nfts[j], DecodeID(nfts[j].TokenID), nfts[j].Name, nodi, 24*3600); err != nil {
+			if err := logica.StoreNFTToNodes(nfts[j], logica.DecodeID(nfts[j].TokenID), nfts[j].Name, nodi, 24*3600); err != nil {
 				fmt.Println("Errore:", err)
 				continue
 			}
@@ -183,12 +159,12 @@ func main() {
 			nodeID = "default"
 		}
 
-		TokenNodo = NewIDFromToken(nodeID, 20)
+		TokenNodo = logica.NewIDFromToken(nodeID, 20)
 
-		fmt.Printf("Sono il nodo %s, PID: %d\n", DecodeID(TokenNodo), os.Getpid())
+		fmt.Printf("Sono il nodo %s, PID: %d\n", logica.DecodeID(TokenNodo), os.Getpid())
 
 		//---------Recuperlo la lista dei nodi chiedendola al Seeder-------------------------
-		nodes, err := GetNodeListIDs("node1:8000", os.Getenv("NODE_ID"))
+		nodes, err := logica.GetNodeListIDs("node1:8000", os.Getenv("NODE_ID"))
 
 		if err != nil {
 			log.Fatalf("Errore recupero nodi dal seeder: %v", err)
@@ -196,18 +172,18 @@ func main() {
 
 		var nodiTokenizati [][]byte
 		for i := 0; i < len(nodes); i++ {
-			nodiTokenizati = append(nodiTokenizati, NewIDFromToken(nodes[i], 20))
+			nodiTokenizati = append(nodiTokenizati, logica.NewIDFromToken(nodes[i], 20))
 		}
 
 		//--------------------Ogni container si trova i k bucket piu vicini e li salva nel proprio volume-------------------//
 
-		Bucket = AssignNFTToNodes(TokenNodo, nodiTokenizati, 8)
+		Bucket = logica.AssignNFTToNodes(TokenNodo, nodiTokenizati, 8)
 
-		BucketSort = removeAndSortMe(Bucket, TokenNodo)
+		BucketSort = logica.RemoveAndSortMe(Bucket, TokenNodo)
 
-		fmt.Printf("sto salvando il kbucket per il nodo,%s\n", DecodeID(TokenNodo))
+		fmt.Printf("sto salvando il kbucket per il nodo,%s\n", logica.DecodeID(TokenNodo))
 
-		err2 := SaveKBucket(nodeID, BucketSort, "/data/kbucket.json")
+		err2 := logica.SaveKBucket(nodeID, BucketSort, "/data/kbucket.json")
 
 		if err2 != nil {
 			log.Fatalf("Errore salvataggio K-bucket: %v", err)

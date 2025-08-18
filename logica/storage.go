@@ -1,4 +1,4 @@
-package main
+package logica
 
 import (
 	"bytes"
@@ -21,41 +21,31 @@ import (
 	pb "kademlia-nft/proto/kad"
 )
 
-func readCsv(path string) []string {
+// tipi condivisi/esportati
+type NFT struct {
+	Index             string
+	Name              string
+	Volume            string
+	Volume_USD        string
+	Market_Cap        string
+	Market_Cap_USD    string
+	Sales             string
+	Floor_Price       string
+	Floor_Price_USD   string
+	Average_Price     string
+	Average_Price_USD string
+	Owners            string
+	Assets            string
+	Owner_Asset_Ratio string
+	Category          string
+	Website           string
+	Logo              string
 
-	//fmt.Printf("file: %s\n", path)
-
-	file, err := os.Open(path)
-	if err != nil {
-		fmt.Printf("Errore nell'aprire il file CSV: %s\n", err)
-		log.Fatal(err)
-	}
-
-	defer file.Close()
-
-	reader := csv.NewReader(file)
-
-	records, err := reader.ReadAll()
-	if err != nil {
-		fmt.Printf("Errore nella lettura del file CSV: %s\n", err)
-		log.Fatal(err)
-	}
-
-	col1 := make([]string, 0, len(records))
-	for i := 0; i < len(records); i++ { // <-- parte da 0
-		row := records[i]
-		if len(row) < 2 {
-			fmt.Printf("Riga %d ha meno di 2 colonne\n", i)
-			continue
-		}
-		col1 = append(col1, row[1])
-	}
-
-	fmt.Println("CSV file read successfully")
-	return col1
+	TokenID            []byte
+	AssignedNodesToken [][]byte
 }
 
-func readCsv2(path string) [][]string {
+func ReadCsv2(path string) [][]string {
 
 	//fmt.Printf("file: %s\n", path)
 
@@ -127,7 +117,7 @@ func LessThan(a, b []byte) bool {
 }
 
 // Generate a list of IDs from a list of tokens or Nodes
-func generateBytesOfAllNfts(list []string) [][]byte {
+func GenerateBytesOfAllNfts(list []string) [][]byte {
 	ids := make([][]byte, len(list))
 	for i, s := range list {
 		ids[i] = NewIDFromToken(s, 20) // 20 bytes = 160 bit
@@ -254,6 +244,101 @@ func StoreNFTToNodes(nft NFT, tokenID string, name string, nodes []string, ttlSe
 	return nil // tutto ok
 }
 
+// StoreNFTToNodes invia lo stesso NFT a tutti i nodi indicati.
+// Ritorna nil se TUTTE le store vanno a buon fine; altrimenti un error descrittivo.
+func StoreNFTToNodes2(nft NFT, tokenID string, name string, nodes []string, ports []int32, ttlSecs int32) error {
+	// chiave Kademlia a 20 byte (coerente con il resto del tuo codice)
+	key := NewIDFromToken(tokenID, 20)
+
+	// payload (serializzazione minimale dell'NFT)
+	payload, _ := json.Marshal(struct {
+		TokenID string `json:"token_id"`
+		Name    string `json:"name"`
+
+		Index string `json:"index,omitempty"`
+
+		Volume            string `json:"volume,omitempty"`
+		Volume_USD        string `json:"volume_usd,omitempty"`
+		Market_Cap        string `json:"market_cap,omitempty"`
+		Market_Cap_USD    string `json:"market_cap_usd,omitempty"`
+		Sales             string `json:"sales,omitempty"`
+		Floor_Price       string `json:"floor_price,omitempty"`
+		Floor_Price_USD   string `json:"floor_price_usd,omitempty"`
+		Average_Price     string `json:"average_price,omitempty"`
+		Average_Price_USD string `json:"average_price_usd,omitempty"`
+		Owners            string `json:"owners,omitempty"`
+		Assets            string `json:"assets,omitempty"`
+		Owner_Asset_Ratio string `json:"owner_asset_ratio,omitempty"`
+		Category          string `json:"category,omitempty"`
+		Website           string `json:"website,omitempty"`
+		Logo              string `json:"logo,omitempty"`
+	}{
+		TokenID:           hex.EncodeToString(key),
+		Name:              name,
+		Index:             nft.Index,
+		Volume:            nft.Volume,
+		Volume_USD:        nft.Volume_USD,
+		Market_Cap:        nft.Market_Cap,
+		Market_Cap_USD:    nft.Market_Cap_USD,
+		Sales:             nft.Sales,
+		Floor_Price:       nft.Floor_Price,
+		Floor_Price_USD:   nft.Floor_Price_USD,
+		Average_Price:     nft.Average_Price,
+		Average_Price_USD: nft.Average_Price_USD,
+		Owners:            nft.Owners,
+		Assets:            nft.Assets,
+		Owner_Asset_Ratio: nft.Owner_Asset_Ratio,
+		Category:          nft.Category,
+		Website:           nft.Website,
+		Logo:              nft.Logo,
+	})
+
+	var errs []string
+	var t int32
+	t = 0
+
+	for _, host := range nodes {
+
+		if strings.TrimSpace(host) == "" {
+			errs = append(errs, "host vuoto")
+			continue
+		}
+
+		addr := fmt.Sprintf("%s:%d", host, 8000)
+
+		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("dial %s: %v", addr, err))
+			continue
+		}
+
+		client := pb.NewKademliaClient(conn)
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		_, callErr := client.Store(ctx, &pb.StoreReq{
+			From:    &pb.Node{Id: "seeder", Host: "seeder", Port: ports[t]},
+			Key:     &pb.Key{Key: key},
+			Value:   &pb.NFTValue{Bytes: payload},
+			TtlSecs: ttlSecs, // es: 24*3600. Metti 0 se non usi TTL.
+		})
+		cancel()
+		_ = conn.Close()
+
+		if callErr != nil {
+			errs = append(errs, fmt.Sprintf("Store(%s): %v", host, callErr))
+			continue
+		}
+
+		t++
+
+		fmt.Printf("✅  NFT inviato %q su %s\n", tokenID, host)
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("alcune Store sono fallite: %s", strings.Join(errs, "; "))
+	}
+	return nil // tutto ok
+}
+
 // ===== Server RPC =====
 
 // Store implementa il metodo Store del servizio Kademlia.
@@ -279,7 +364,7 @@ func (s *KademliaServer) Store(ctx context.Context, req *pb.StoreReq) (*pb.Store
 	return &pb.StoreRes{Ok: true}, nil
 }
 
-func runGRPCServer() error {
+func RunGRPCServer() error {
 	lis, err := net.Listen("tcp", ":8000")
 	if err != nil {
 		return err
@@ -290,7 +375,7 @@ func runGRPCServer() error {
 	return gs.Serve(lis) // BLOCCA
 }
 
-func waitReady(host string, timeout time.Duration) error {
+func WaitReady(host string, timeout time.Duration) error {
 	addr := fmt.Sprintf("%s:8000", host)
 	deadline := time.Now().Add(timeout)
 	for {
@@ -333,7 +418,7 @@ func ListNodeVolumeFiles(nodeID string) ([]string, error) {
 	return files, nil
 }
 
-func hexFileNameFromName(nameBytes []byte) string {
+func HexFileNameFromName(nameBytes []byte) string {
 	// pad/truncate a 20 byte e poi hex
 	fixed := make([]byte, 20)
 	copy(fixed, nameBytes) // se nameBytes >20 viene troncato, se <20 viene padded con 0x00
@@ -386,7 +471,7 @@ func (s *KademliaServer) LookupNFT(ctx context.Context, req *pb.LookupNFTReq) (*
 
 	// Costruzione nome file NFT
 	nameRaw := req.GetKey().GetKey()
-	fileName := hexFileNameFromName(nameRaw)
+	fileName := HexFileNameFromName(nameRaw)
 	filePath := filepath.Join(dataDir, fileName)
 
 	log.Printf("[SERVER %s] LookupNFT: name='%s' → file='%s'",

@@ -1,4 +1,4 @@
-package main
+package logica
 
 import (
 	"bytes"
@@ -48,7 +48,7 @@ func SaveKBucket(nodeID string, bucket [][]byte, path string) error {
 	return os.WriteFile(path, jsonBytes, 0o644)
 }
 
-func removeAndSortMe(bucket [][]byte, selfId []byte) [][]byte {
+func RemoveAndSortMe(bucket [][]byte, selfId []byte) [][]byte {
 	// Rimuove un nodo dal bucket
 	for i := range bucket {
 		if bytes.Equal(bucket[i], selfId) {

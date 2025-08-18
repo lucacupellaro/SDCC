@@ -6,6 +6,9 @@ import (
 	"context"
 	"fmt"
 	pb "kademlia-nft/proto/kad"
+
+	"kademlia-nft/logica"
+
 	"math/big"
 	"os"
 	"os/exec"
@@ -41,8 +44,8 @@ Benvenuto! Seleziona un'operazione:
 
   1) Elenca nodi
   2) Mostra k-bucket di un nodo
-  3) Seleziona nodo 
-  4) Cerca NFT a partire dal nodo corrente
+  3) Cerca un NFT  
+  4) Aggiungi un NFT
   5) Mostra collegamenti (edges)
   6) Esci
 `)
@@ -113,53 +116,6 @@ func dedupe(in []string) []string {
 	return out
 }
 
-func NewIDFromToken(tokenID string, size int) []byte {
-	b := []byte(tokenID)
-	if len(b) > size {
-		out := make([]byte, size)
-		copy(out, b[:size])
-		return out
-	}
-	padded := make([]byte, size)
-	copy(padded, b)
-	return padded
-}
-
-func DecodeID(b []byte) string {
-	return string(bytes.TrimRight(b, "\x00"))
-}
-
-func XOR(a, b []byte) []byte {
-	// assume stesse lunghezze; se no, usa la min
-	n := len(a)
-	if len(b) < n {
-		n = len(b)
-	}
-	out := make([]byte, n)
-	for i := 0; i < n; i++ {
-		out[i] = a[i] ^ b[i]
-	}
-	return out
-}
-
-// confronto lessicografico: true se a < b
-func LessThan(a, b []byte) bool {
-	n := len(a)
-	if len(b) < n {
-		n = len(b)
-	}
-	for i := 0; i < n; i++ {
-		if a[i] < b[i] {
-			return true
-		}
-		if a[i] > b[i] {
-			return false
-		}
-	}
-	// se prefissi uguali, quello più corto è “minore”
-	return len(a) < len(b)
-}
-
 func resolveStartHostPort(name string) (string, error) {
 	name = strings.TrimSpace(strings.ToLower(name))
 	// supporta sia "node3" sia "nodo3"
@@ -220,7 +176,7 @@ func LookupNFTOnNodeByName(startNode, nftName string, maxHops int) error {
 		maxHops = 15
 	}
 
-	nftID20 := NewIDFromToken(nftName, 20)
+	nftID20 := logica.NewIDFromToken(nftName, 20)
 	visited := make(map[string]bool)
 	current := startNode
 
@@ -311,7 +267,7 @@ func sceltaNodoPiuVicino(nftID20 []byte, nodiVicini []string) (string, error) {
 
 	for _, idStr := range nodiVicini {
 		// Ricostruisco l'ID a 20 byte come fai ovunque (NewIDFromToken)
-		nidBytes := NewIDFromToken(idStr, 20)
+		nidBytes := logica.NewIDFromToken(idStr, 20)
 
 		// XOR byte-wise
 		distBytes := make([]byte, len(nftID20))
