@@ -9,6 +9,7 @@ import (
 
 	"kademlia-nft/logica"
 
+	"log"
 	"math/big"
 	"os"
 	"os/exec"
@@ -286,4 +287,54 @@ func sceltaNodoPiuVicino(nftID20 []byte, nodiVicini []string) (string, error) {
 		return "", fmt.Errorf("nessun nodo valido trovato")
 	}
 	return bestNode, nil
+}
+
+func RPCGetKBucket(nodeAddr string) ([]string, error) {
+
+	add, err := resolveStartHostPort(nodeAddr)
+	fmt.Printf("🔍 Recupero KBucket di %s\n", add)
+	if err != nil {
+		return nil, fmt.Errorf("risoluzione %q fallita: %w", nodeAddr, err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	conn, err := grpc.DialContext(ctx, add,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("dial %s: %v", add, err)
+	}
+	defer conn.Close()
+
+	client := pb.NewKademliaClient(conn)
+	resp, err := client.GetKBucket(ctx, &pb.GetKBucketReq{RequesterId: "cli"})
+	if err != nil {
+		return nil, fmt.Errorf("rpc GetKBucket: %v", err)
+	}
+
+	// converto []*pb.Node in []string
+	var res []string
+	for _, n := range resp.Nodes {
+		res = append(res, n.Id)
+	}
+
+	return res, nil
+}
+
+func PingNode(startNode, targetNode string) {
+	current := startNode
+
+	fmt.Printf("🔍 Inizio PING da %s a %s\n", current, targetNode)
+
+	var nodi []string
+	// 1) prendi il KBucket di current via RPC
+	nodi, err := RPCGetKBucket(current)
+	if err != nil {
+		log.Fatal("Errore RPCGetKBucket:", err)
+	}
+
+	fmt.Printf("🔍 KBucket di %s: %d nodi\n", current, len(nodi))
+
 }

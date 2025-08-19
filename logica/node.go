@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"sort"
@@ -114,4 +115,35 @@ func GetNodeListIDs(seederAddr, requesterID string) ([]string, error) {
 		ids = append(ids, n.Id)
 	}
 	return ids, nil
+}
+
+func (s *KademliaServer) GetKBucket(ctx context.Context, req *pb.GetKBucketReq) (*pb.GetKBucketResp, error) {
+	// Leggi il file kbucket.json del container
+	data, err := os.ReadFile("kbucket.json")
+	if err != nil {
+		return nil, fmt.Errorf("errore lettura kbucket.json: %w", err)
+	}
+
+	// Struttura che mappa il JSON reale
+	var kb struct {
+		NodeID    string   `json:"node_id"`
+		BucketHex []string `json:"bucket_hex"`
+		SavedAt   string   `json:"saved_at"`
+	}
+
+	if err := json.Unmarshal(data, &kb); err != nil {
+		return nil, fmt.Errorf("errore parse kbucket.json: %w", err)
+	}
+
+	// Converto bucket_hex -> []*pb.Node
+	var nodes []*pb.Node
+	for _, hexID := range kb.BucketHex {
+		nodes = append(nodes, &pb.Node{
+			Id:   hexID,
+			Host: "", // opzionale: puoi metterci "nodeX"
+			Port: 0,
+		})
+	}
+
+	return &pb.GetKBucketResp{Nodes: nodes}, nil
 }

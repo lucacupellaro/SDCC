@@ -244,19 +244,29 @@ func StoreNFTToNodes(nft NFT, tokenID string, name string, nodes []string, ttlSe
 	return nil // tutto ok
 }
 
-// StoreNFTToNodes invia lo stesso NFT a tutti i nodi indicati.
-// Ritorna nil se TUTTE le store vanno a buon fine; altrimenti un error descrittivo.
-func StoreNFTToNodes2(nft NFT, tokenID string, name string, nodes []string, ports []int32, ttlSecs int32) error {
-	// chiave Kademlia a 20 byte (coerente con il resto del tuo codice)
+// Se CLI su host: localhost:8000+n ; se CLI in Docker: nodeN:8000
+func resolveAddrForNode(nodeName string) (string, error) {
+	name := strings.ToLower(strings.TrimSpace(nodeName))
+	if strings.HasPrefix(name, "nodo") {
+		name = "node" + name[len("nodo"):]
+	}
+	var n int
+	if _, err := fmt.Sscanf(name, "node%d", &n); err != nil || n < 1 || n > 11 {
+		return "", fmt.Errorf("nome nodo non valido: %q", nodeName)
+	}
+	if os.Getenv("CLI_IN_DOCKER") == "1" {
+		return fmt.Sprintf("node%d:%d", n, 8000), nil
+	}
+	return fmt.Sprintf("localhost:%d", 8000+n), nil
+}
+
+func StoreNFTToNodes2(nft NFT, tokenID, name string, nodes []string, ttlSecs int32) error {
 	key := NewIDFromToken(tokenID, 20)
 
-	// payload (serializzazione minimale dell'NFT)
 	payload, _ := json.Marshal(struct {
-		TokenID string `json:"token_id"`
-		Name    string `json:"name"`
-
-		Index string `json:"index,omitempty"`
-
+		TokenID           string `json:"token_id"`
+		Name              string `json:"name"`
+		Index             string `json:"index,omitempty"`
 		Volume            string `json:"volume,omitempty"`
 		Volume_USD        string `json:"volume_usd,omitempty"`
 		Market_Cap        string `json:"market_cap,omitempty"`
@@ -294,49 +304,53 @@ func StoreNFTToNodes2(nft NFT, tokenID string, name string, nodes []string, port
 	})
 
 	var errs []string
-	var t int32
-	t = 0
 
-	for _, host := range nodes {
-
-		if strings.TrimSpace(host) == "" {
+	for _, nodeName := range nodes {
+		if strings.TrimSpace(nodeName) == "" {
 			errs = append(errs, "host vuoto")
 			continue
 		}
 
-		addr := fmt.Sprintf("%s:%d", host, 8000)
+		addr, rerr := resolveAddrForNode(nodeName)
+		if rerr != nil {
+			errs = append(errs, fmt.Sprintf("resolve %s: %v", nodeName, rerr))
+			continue
+		}
 
-		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		fmt.Printf("→ dial %s per salvare %q\n", addr, name)
+		conn, err := grpc.Dial(addr,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithBlock(),
+			grpc.WithReturnConnectionError(),
+		)
 		if err != nil {
 			errs = append(errs, fmt.Sprintf("dial %s: %v", addr, err))
 			continue
 		}
 
 		client := pb.NewKademliaClient(conn)
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
 		_, callErr := client.Store(ctx, &pb.StoreReq{
-			From:    &pb.Node{Id: "seeder", Host: "seeder", Port: ports[t]},
+			From:    &pb.Node{Id: "seeder", Host: "seeder", Port: 0}, // info meta, non usata
 			Key:     &pb.Key{Key: key},
 			Value:   &pb.NFTValue{Bytes: payload},
-			TtlSecs: ttlSecs, // es: 24*3600. Metti 0 se non usi TTL.
+			TtlSecs: ttlSecs,
 		})
 		cancel()
 		_ = conn.Close()
 
 		if callErr != nil {
-			errs = append(errs, fmt.Sprintf("Store(%s): %v", host, callErr))
+			errs = append(errs, fmt.Sprintf("Store(%s): %v", nodeName, callErr))
 			continue
 		}
 
-		t++
-
-		fmt.Printf("✅  NFT inviato %q su %s\n", tokenID, host)
+		fmt.Printf("✅  NFT inviato %q su %s\n", tokenID, nodeName)
 	}
 
 	if len(errs) > 0 {
 		return fmt.Errorf("alcune Store sono fallite: %s", strings.Join(errs, "; "))
 	}
-	return nil // tutto ok
+	return nil
 }
 
 // ===== Server RPC =====
@@ -525,4 +539,15 @@ func (s *KademliaServer) LookupNFT(ctx context.Context, req *pb.LookupNFTReq) (*
 
 	log.Printf("[SERVER %s] Ritorno %d nodi vicini dal kbucket", os.Getenv("NODE_ID"), len(nearest))
 	return &pb.LookupNFTRes{Found: false, Nearest: nearest}, nil
+}
+
+func RemoveNode1(nodi *[]string) {
+
+	out := (*nodi)[:0]
+	for _, s := range *nodi {
+		if s != "node1" {
+			out = append(out, s)
+		}
+	}
+	*nodi = out
 }

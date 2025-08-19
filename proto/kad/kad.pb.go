@@ -490,6 +490,94 @@ func (x *LookupNFTRes) GetNearest() []*Node {
 	return nil
 }
 
+type GetKBucketReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RequesterId   string                 `protobuf:"bytes,1,opt,name=requester_id,json=requesterId,proto3" json:"requester_id,omitempty"` // opzionale, per logging o debugging
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetKBucketReq) Reset() {
+	*x = GetKBucketReq{}
+	mi := &file_proto_kad_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetKBucketReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetKBucketReq) ProtoMessage() {}
+
+func (x *GetKBucketReq) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_kad_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetKBucketReq.ProtoReflect.Descriptor instead.
+func (*GetKBucketReq) Descriptor() ([]byte, []int) {
+	return file_proto_kad_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *GetKBucketReq) GetRequesterId() string {
+	if x != nil {
+		return x.RequesterId
+	}
+	return ""
+}
+
+type GetKBucketResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Nodes         []*Node                `protobuf:"bytes,1,rep,name=nodes,proto3" json:"nodes,omitempty"` // la lista dei nodi conosciuti
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetKBucketResp) Reset() {
+	*x = GetKBucketResp{}
+	mi := &file_proto_kad_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetKBucketResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetKBucketResp) ProtoMessage() {}
+
+func (x *GetKBucketResp) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_kad_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetKBucketResp.ProtoReflect.Descriptor instead.
+func (*GetKBucketResp) Descriptor() ([]byte, []int) {
+	return file_proto_kad_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *GetKBucketResp) GetNodes() []*Node {
+	if x != nil {
+		return x.Nodes
+	}
+	return nil
+}
+
 var File_proto_kad_proto protoreflect.FileDescriptor
 
 const file_proto_kad_proto_rawDesc = "" +
@@ -521,11 +609,17 @@ const file_proto_kad_proto_rawDesc = "" +
 	"\x05found\x18\x01 \x01(\bR\x05found\x12!\n" +
 	"\x06holder\x18\x02 \x01(\v2\t.kad.NodeR\x06holder\x12#\n" +
 	"\x05value\x18\x03 \x01(\v2\r.kad.NFTValueR\x05value\x12#\n" +
-	"\anearest\x18\x04 \x03(\v2\t.kad.NodeR\anearest2\x9d\x01\n" +
+	"\anearest\x18\x04 \x03(\v2\t.kad.NodeR\anearest\"2\n" +
+	"\rGetKBucketReq\x12!\n" +
+	"\frequester_id\x18\x01 \x01(\tR\vrequesterId\"1\n" +
+	"\x0eGetKBucketResp\x12\x1f\n" +
+	"\x05nodes\x18\x01 \x03(\v2\t.kad.NodeR\x05nodes2\xd4\x01\n" +
 	"\bKademlia\x12%\n" +
 	"\x05Store\x12\r.kad.StoreReq\x1a\r.kad.StoreRes\x127\n" +
 	"\vGetNodeList\x12\x13.kad.GetNodeListReq\x1a\x13.kad.GetNodeListRes\x121\n" +
-	"\tLookupNFT\x12\x11.kad.LookupNFTReq\x1a\x11.kad.LookupNFTResB\x0fZ\rproto/kad;kadb\x06proto3"
+	"\tLookupNFT\x12\x11.kad.LookupNFTReq\x1a\x11.kad.LookupNFTRes\x125\n" +
+	"\n" +
+	"GetKBucket\x12\x12.kad.GetKBucketReq\x1a\x13.kad.GetKBucketRespB\x0fZ\rproto/kad;kadb\x06proto3"
 
 var (
 	file_proto_kad_proto_rawDescOnce sync.Once
@@ -539,7 +633,7 @@ func file_proto_kad_proto_rawDescGZIP() []byte {
 	return file_proto_kad_proto_rawDescData
 }
 
-var file_proto_kad_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_proto_kad_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_proto_kad_proto_goTypes = []any{
 	(*Node)(nil),           // 0: kad.Node
 	(*Key)(nil),            // 1: kad.Key
@@ -550,6 +644,8 @@ var file_proto_kad_proto_goTypes = []any{
 	(*GetNodeListRes)(nil), // 6: kad.GetNodeListRes
 	(*LookupNFTReq)(nil),   // 7: kad.LookupNFTReq
 	(*LookupNFTRes)(nil),   // 8: kad.LookupNFTRes
+	(*GetKBucketReq)(nil),  // 9: kad.GetKBucketReq
+	(*GetKBucketResp)(nil), // 10: kad.GetKBucketResp
 }
 var file_proto_kad_proto_depIdxs = []int32{
 	0,  // 0: kad.StoreReq.from:type_name -> kad.Node
@@ -560,17 +656,20 @@ var file_proto_kad_proto_depIdxs = []int32{
 	0,  // 5: kad.LookupNFTRes.holder:type_name -> kad.Node
 	2,  // 6: kad.LookupNFTRes.value:type_name -> kad.NFTValue
 	0,  // 7: kad.LookupNFTRes.nearest:type_name -> kad.Node
-	3,  // 8: kad.Kademlia.Store:input_type -> kad.StoreReq
-	5,  // 9: kad.Kademlia.GetNodeList:input_type -> kad.GetNodeListReq
-	7,  // 10: kad.Kademlia.LookupNFT:input_type -> kad.LookupNFTReq
-	4,  // 11: kad.Kademlia.Store:output_type -> kad.StoreRes
-	6,  // 12: kad.Kademlia.GetNodeList:output_type -> kad.GetNodeListRes
-	8,  // 13: kad.Kademlia.LookupNFT:output_type -> kad.LookupNFTRes
-	11, // [11:14] is the sub-list for method output_type
-	8,  // [8:11] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	0,  // 8: kad.GetKBucketResp.nodes:type_name -> kad.Node
+	3,  // 9: kad.Kademlia.Store:input_type -> kad.StoreReq
+	5,  // 10: kad.Kademlia.GetNodeList:input_type -> kad.GetNodeListReq
+	7,  // 11: kad.Kademlia.LookupNFT:input_type -> kad.LookupNFTReq
+	9,  // 12: kad.Kademlia.GetKBucket:input_type -> kad.GetKBucketReq
+	4,  // 13: kad.Kademlia.Store:output_type -> kad.StoreRes
+	6,  // 14: kad.Kademlia.GetNodeList:output_type -> kad.GetNodeListRes
+	8,  // 15: kad.Kademlia.LookupNFT:output_type -> kad.LookupNFTRes
+	10, // 16: kad.Kademlia.GetKBucket:output_type -> kad.GetKBucketResp
+	13, // [13:17] is the sub-list for method output_type
+	9,  // [9:13] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_proto_kad_proto_init() }
@@ -584,7 +683,7 @@ func file_proto_kad_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_kad_proto_rawDesc), len(file_proto_kad_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

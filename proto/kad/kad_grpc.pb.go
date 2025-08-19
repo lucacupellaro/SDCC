@@ -22,6 +22,7 @@ const (
 	Kademlia_Store_FullMethodName       = "/kad.Kademlia/Store"
 	Kademlia_GetNodeList_FullMethodName = "/kad.Kademlia/GetNodeList"
 	Kademlia_LookupNFT_FullMethodName   = "/kad.Kademlia/LookupNFT"
+	Kademlia_GetKBucket_FullMethodName  = "/kad.Kademlia/GetKBucket"
 )
 
 // KademliaClient is the client API for Kademlia service.
@@ -33,6 +34,7 @@ type KademliaClient interface {
 	Store(ctx context.Context, in *StoreReq, opts ...grpc.CallOption) (*StoreRes, error)
 	GetNodeList(ctx context.Context, in *GetNodeListReq, opts ...grpc.CallOption) (*GetNodeListRes, error)
 	LookupNFT(ctx context.Context, in *LookupNFTReq, opts ...grpc.CallOption) (*LookupNFTRes, error)
+	GetKBucket(ctx context.Context, in *GetKBucketReq, opts ...grpc.CallOption) (*GetKBucketResp, error)
 }
 
 type kademliaClient struct {
@@ -73,6 +75,16 @@ func (c *kademliaClient) LookupNFT(ctx context.Context, in *LookupNFTReq, opts .
 	return out, nil
 }
 
+func (c *kademliaClient) GetKBucket(ctx context.Context, in *GetKBucketReq, opts ...grpc.CallOption) (*GetKBucketResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetKBucketResp)
+	err := c.cc.Invoke(ctx, Kademlia_GetKBucket_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // KademliaServer is the server API for Kademlia service.
 // All implementations must embed UnimplementedKademliaServer
 // for forward compatibility.
@@ -82,6 +94,7 @@ type KademliaServer interface {
 	Store(context.Context, *StoreReq) (*StoreRes, error)
 	GetNodeList(context.Context, *GetNodeListReq) (*GetNodeListRes, error)
 	LookupNFT(context.Context, *LookupNFTReq) (*LookupNFTRes, error)
+	GetKBucket(context.Context, *GetKBucketReq) (*GetKBucketResp, error)
 	mustEmbedUnimplementedKademliaServer()
 }
 
@@ -100,6 +113,9 @@ func (UnimplementedKademliaServer) GetNodeList(context.Context, *GetNodeListReq)
 }
 func (UnimplementedKademliaServer) LookupNFT(context.Context, *LookupNFTReq) (*LookupNFTRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method LookupNFT not implemented")
+}
+func (UnimplementedKademliaServer) GetKBucket(context.Context, *GetKBucketReq) (*GetKBucketResp, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetKBucket not implemented")
 }
 func (UnimplementedKademliaServer) mustEmbedUnimplementedKademliaServer() {}
 func (UnimplementedKademliaServer) testEmbeddedByValue()                  {}
@@ -176,6 +192,24 @@ func _Kademlia_LookupNFT_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Kademlia_GetKBucket_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetKBucketReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(KademliaServer).GetKBucket(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Kademlia_GetKBucket_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(KademliaServer).GetKBucket(ctx, req.(*GetKBucketReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Kademlia_ServiceDesc is the grpc.ServiceDesc for Kademlia service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -194,6 +228,10 @@ var Kademlia_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "LookupNFT",
 			Handler:    _Kademlia_LookupNFT_Handler,
+		},
+		{
+			MethodName: "GetKBucket",
+			Handler:    _Kademlia_GetKBucket_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

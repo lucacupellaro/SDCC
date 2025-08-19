@@ -15,6 +15,38 @@ func main() {
 	choice := ui.ShowWelcomeMenu()
 	fmt.Println("Hai scelto:", choice)
 
+	if choice == 1 {
+		fmt.Printf("Hai scelto l'opzione 1\n")
+	}
+
+	if choice == 2 {
+		fmt.Printf("Hai scelto l'opzione 2. PING\n")
+
+		/*
+
+
+			fmt.Printf("Da quale nodo vuoi fare il PING?\n")
+
+			nodi, err := ui.ListActiveComposeServices("kademlia-nft")
+			if err != nil {
+				log.Fatal("Errore recupero nodi:", err)
+			}
+			fmt.Println("Container attivi:")
+			for _, n := range nodi {
+				fmt.Println(" -", n)
+			}
+
+			fmt.Printf("Verso quale nodo vuoi fare il PING?\n")
+			fmt.Println("Container attivi:")
+			for _, n := range nodi {
+				fmt.Println(" -", n)
+			}
+		*/
+
+		ui.PingNode("node2", "node4")
+
+	}
+
 	if choice == 3 {
 		var nodi []string
 		nodi, err := ui.ListActiveComposeServices("kademlia-nft")
@@ -73,6 +105,9 @@ func main() {
 		for _, n := range nodi {
 			fmt.Println(" -", n)
 		}
+
+		logica.RemoveNode1(&nodi)
+
 		var iDnew [][]byte
 		iDnew = make([][]byte, len(nodi))
 		for i, p := range nodi {
@@ -112,14 +147,11 @@ func main() {
 		nodiSeletcted = append(nodiSeletcted, logica.DecodeID(nfts[0].AssignedNodesToken[0]))
 		nodiSeletcted = append(nodiSeletcted, logica.DecodeID(nfts[0].AssignedNodesToken[1]))
 
-		var por []int32
-		por = append(por, 8002)
-		por = append(por, 8003)
-
-		if err := logica.StoreNFTToNodes2(nfts[0], logica.DecodeID(nfts[0].TokenID), nfts[0].Name, nodiSeletcted, por, 24*3600); err != nil {
+		if err := logica.StoreNFTToNodes2(nfts[0], logica.DecodeID(nfts[0].TokenID), nfts[0].Name, nodiSeletcted, 24*3600); err != nil {
 			fmt.Println("Errore:", err)
 
 		}
 
 	}
+
 }
