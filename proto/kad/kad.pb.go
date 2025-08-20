@@ -578,6 +578,110 @@ func (x *GetKBucketResp) GetNodes() []*Node {
 	return nil
 }
 
+type PingReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	From          *Node                  `protobuf:"bytes,1,opt,name=from,proto3" json:"from,omitempty"` // chi sta pingando (X)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PingReq) Reset() {
+	*x = PingReq{}
+	mi := &file_proto_kad_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PingReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PingReq) ProtoMessage() {}
+
+func (x *PingReq) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_kad_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PingReq.ProtoReflect.Descriptor instead.
+func (*PingReq) Descriptor() ([]byte, []int) {
+	return file_proto_kad_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *PingReq) GetFrom() *Node {
+	if x != nil {
+		return x.From
+	}
+	return nil
+}
+
+type PingRes struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ok            bool                   `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`                       // true = sono vivo
+	NodeId        string                 `protobuf:"bytes,2,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`  // mio id (Y)
+	UnixMs        int64                  `protobuf:"varint,3,opt,name=unix_ms,json=unixMs,proto3" json:"unix_ms,omitempty"` // timestamp server
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PingRes) Reset() {
+	*x = PingRes{}
+	mi := &file_proto_kad_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PingRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PingRes) ProtoMessage() {}
+
+func (x *PingRes) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_kad_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PingRes.ProtoReflect.Descriptor instead.
+func (*PingRes) Descriptor() ([]byte, []int) {
+	return file_proto_kad_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *PingRes) GetOk() bool {
+	if x != nil {
+		return x.Ok
+	}
+	return false
+}
+
+func (x *PingRes) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *PingRes) GetUnixMs() int64 {
+	if x != nil {
+		return x.UnixMs
+	}
+	return 0
+}
+
 var File_proto_kad_proto protoreflect.FileDescriptor
 
 const file_proto_kad_proto_rawDesc = "" +
@@ -613,13 +717,20 @@ const file_proto_kad_proto_rawDesc = "" +
 	"\rGetKBucketReq\x12!\n" +
 	"\frequester_id\x18\x01 \x01(\tR\vrequesterId\"1\n" +
 	"\x0eGetKBucketResp\x12\x1f\n" +
-	"\x05nodes\x18\x01 \x03(\v2\t.kad.NodeR\x05nodes2\xd4\x01\n" +
+	"\x05nodes\x18\x01 \x03(\v2\t.kad.NodeR\x05nodes\"(\n" +
+	"\aPingReq\x12\x1d\n" +
+	"\x04from\x18\x01 \x01(\v2\t.kad.NodeR\x04from\"K\n" +
+	"\aPingRes\x12\x0e\n" +
+	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x17\n" +
+	"\anode_id\x18\x02 \x01(\tR\x06nodeId\x12\x17\n" +
+	"\aunix_ms\x18\x03 \x01(\x03R\x06unixMs2\xf8\x01\n" +
 	"\bKademlia\x12%\n" +
 	"\x05Store\x12\r.kad.StoreReq\x1a\r.kad.StoreRes\x127\n" +
 	"\vGetNodeList\x12\x13.kad.GetNodeListReq\x1a\x13.kad.GetNodeListRes\x121\n" +
 	"\tLookupNFT\x12\x11.kad.LookupNFTReq\x1a\x11.kad.LookupNFTRes\x125\n" +
 	"\n" +
-	"GetKBucket\x12\x12.kad.GetKBucketReq\x1a\x13.kad.GetKBucketRespB\x0fZ\rproto/kad;kadb\x06proto3"
+	"GetKBucket\x12\x12.kad.GetKBucketReq\x1a\x13.kad.GetKBucketResp\x12\"\n" +
+	"\x04Ping\x12\f.kad.PingReq\x1a\f.kad.PingResB\x0fZ\rproto/kad;kadb\x06proto3"
 
 var (
 	file_proto_kad_proto_rawDescOnce sync.Once
@@ -633,7 +744,7 @@ func file_proto_kad_proto_rawDescGZIP() []byte {
 	return file_proto_kad_proto_rawDescData
 }
 
-var file_proto_kad_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_proto_kad_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_proto_kad_proto_goTypes = []any{
 	(*Node)(nil),           // 0: kad.Node
 	(*Key)(nil),            // 1: kad.Key
@@ -646,6 +757,8 @@ var file_proto_kad_proto_goTypes = []any{
 	(*LookupNFTRes)(nil),   // 8: kad.LookupNFTRes
 	(*GetKBucketReq)(nil),  // 9: kad.GetKBucketReq
 	(*GetKBucketResp)(nil), // 10: kad.GetKBucketResp
+	(*PingReq)(nil),        // 11: kad.PingReq
+	(*PingRes)(nil),        // 12: kad.PingRes
 }
 var file_proto_kad_proto_depIdxs = []int32{
 	0,  // 0: kad.StoreReq.from:type_name -> kad.Node
@@ -657,19 +770,22 @@ var file_proto_kad_proto_depIdxs = []int32{
 	2,  // 6: kad.LookupNFTRes.value:type_name -> kad.NFTValue
 	0,  // 7: kad.LookupNFTRes.nearest:type_name -> kad.Node
 	0,  // 8: kad.GetKBucketResp.nodes:type_name -> kad.Node
-	3,  // 9: kad.Kademlia.Store:input_type -> kad.StoreReq
-	5,  // 10: kad.Kademlia.GetNodeList:input_type -> kad.GetNodeListReq
-	7,  // 11: kad.Kademlia.LookupNFT:input_type -> kad.LookupNFTReq
-	9,  // 12: kad.Kademlia.GetKBucket:input_type -> kad.GetKBucketReq
-	4,  // 13: kad.Kademlia.Store:output_type -> kad.StoreRes
-	6,  // 14: kad.Kademlia.GetNodeList:output_type -> kad.GetNodeListRes
-	8,  // 15: kad.Kademlia.LookupNFT:output_type -> kad.LookupNFTRes
-	10, // 16: kad.Kademlia.GetKBucket:output_type -> kad.GetKBucketResp
-	13, // [13:17] is the sub-list for method output_type
-	9,  // [9:13] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	0,  // 9: kad.PingReq.from:type_name -> kad.Node
+	3,  // 10: kad.Kademlia.Store:input_type -> kad.StoreReq
+	5,  // 11: kad.Kademlia.GetNodeList:input_type -> kad.GetNodeListReq
+	7,  // 12: kad.Kademlia.LookupNFT:input_type -> kad.LookupNFTReq
+	9,  // 13: kad.Kademlia.GetKBucket:input_type -> kad.GetKBucketReq
+	11, // 14: kad.Kademlia.Ping:input_type -> kad.PingReq
+	4,  // 15: kad.Kademlia.Store:output_type -> kad.StoreRes
+	6,  // 16: kad.Kademlia.GetNodeList:output_type -> kad.GetNodeListRes
+	8,  // 17: kad.Kademlia.LookupNFT:output_type -> kad.LookupNFTRes
+	10, // 18: kad.Kademlia.GetKBucket:output_type -> kad.GetKBucketResp
+	12, // 19: kad.Kademlia.Ping:output_type -> kad.PingRes
+	15, // [15:20] is the sub-list for method output_type
+	10, // [10:15] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_proto_kad_proto_init() }
@@ -683,7 +799,7 @@ func file_proto_kad_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_kad_proto_rawDesc), len(file_proto_kad_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

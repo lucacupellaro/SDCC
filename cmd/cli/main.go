@@ -43,7 +43,7 @@ func main() {
 			}
 		*/
 
-		ui.PingNode("node2", "node4")
+		ui.PingNode("node5", "node7")
 
 	}
 

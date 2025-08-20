@@ -4,12 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
 	pb "kademlia-nft/proto/kad"
 
 	"kademlia-nft/logica"
 
-	"log"
 	"math/big"
 	"os"
 	"os/exec"
@@ -30,10 +30,6 @@ const (
 	MenuShowEdges
 	MenuQuit
 )
-
-type KademliaServer struct {
-	pb.UnimplementedKademliaServer
-}
 
 func ShowWelcomeMenu() MenuChoice {
 	fmt.Print("\033[2J\033[H") // clear screen
@@ -323,18 +319,202 @@ func RPCGetKBucket(nodeAddr string) ([]string, error) {
 	return res, nil
 }
 
+/*
 func PingNode(startNode, targetNode string) {
 	current := startNode
+	targetID := logica.NewIDFromToken(targetNode, 20) // per distanza XOR
+	visited := map[string]bool{}
+	maxHops := 20
+	var nodeVisited []string
 
-	fmt.Printf("🔍 Inizio PING da %s a %s\n", current, targetNode)
+	for hop := 0; hop < maxHops; hop++ {
+		fmt.Printf("🔍 Inizio PING da %s a %s (hop %d)\n", current, targetNode, hop+1)
 
-	var nodi []string
-	// 1) prendi il KBucket di current via RPC
-	nodi, err := RPCGetKBucket(current)
-	if err != nil {
-		log.Fatal("Errore RPCGetKBucket:", err)
+		// 1) KBucket del nodo corrente
+		nodi, err := RPCGetKBucket(current)
+		if err != nil {
+			log.Fatal("Errore RPCGetKBucket:", err)
+		}
+
+		// Se il server ti restituisce esadecimale, normalizza a "nodeX".
+		nodi = normalizeIDs(nodi)
+
+		// 2) Trovato direttamente?
+		found := false
+		for _, n := range nodi {
+			if n == targetNode {
+				found = true
+				break
+			}
+		}
+		if found {
+			fmt.Printf("🔍 Nodo %s trovato in KBucket di %s\n", targetNode, current)
+			fmt.Printf("🔍 Stiamo mandando una richista di Ping\n")
+			if err := SendPing(current, targetNode); err != nil {
+				fmt.Printf("⚠️  Errore durante l'invio del Ping: %v\n", err)
+			}
+			return
+		}
+
+		// 3) Scegli il prossimo vicino al target evitando i già visitati
+		visited[current] = true
+		candidates := make([]string, 0, len(nodi))
+		for _, n := range nodi {
+			if !visited[n] {
+				candidates = append(candidates, n)
+			}
+		}
+		if len(candidates) == 0 {
+			fmt.Println("✖ Nessun vicino non visitato — arresto.")
+			return
+		}
+
+		best, err := sceltaNodoPiuVicino(targetID, candidates)
+		if err != nil {
+			fmt.Printf("⚠️  Impossibile scegliere il nodo più vicino: %v\n", err)
+			return
+		}
+		fmt.Printf("➡️  Prossimo nodo scelto: %s\n", best)
+		current = best
 	}
 
-	fmt.Printf("🔍 KBucket di %s: %d nodi\n", current, len(nodi))
+	fmt.Println("⛔ Max hop raggiunto senza raggiungere il target.")
+}
+*/
 
+func xorDist(a20 []byte, b20 []byte) *big.Int {
+	nb := make([]byte, len(a20))
+	for i := range a20 {
+		nb[i] = a20[i] ^ b20[i]
+	}
+	return new(big.Int).SetBytes(nb)
+}
+
+func PingNode(startNode, targetNode string) {
+	targetID := logica.NewIDFromToken(targetNode, 20)
+	visited := map[string]bool{}
+	candidates := map[string]bool{} // insieme senza duplicati
+	addCand := func(list []string) {
+		for _, n := range list {
+			if n == "" {
+				continue
+			}
+			candidates[n] = true
+		}
+	}
+
+	// seed: parti dal nodo iniziale e dai suoi vicini
+	addCand([]string{startNode})
+
+	bestDist := (*big.Int)(nil)
+	stagnate := 0
+	maxHops := 30
+
+	for hop := 0; hop < maxHops; hop++ {
+		// scegli il candidato non visitato più vicino al target
+		var next string
+		var nextD *big.Int
+		for id := range candidates {
+			if visited[id] {
+				continue
+			}
+			d := xorDist(targetID, logica.NewIDFromToken(id, 20))
+			if next == "" || d.Cmp(nextD) < 0 {
+				next = id
+				nextD = d
+			}
+		}
+		if next == "" {
+			fmt.Println("✖ Nessun vicino non visitato — arresto.")
+			return
+		}
+
+		fmt.Printf("🔍 Inizio PING da %s a %s (hop %d)\n", next, targetNode, hop+1)
+		visited[next] = true
+
+		// prendi KBucket del candidato
+		kb, err := RPCGetKBucket(next)
+		if err != nil {
+			fmt.Printf("⚠️  GetKBucket(%s) fallita: %v\n", next, err)
+			continue
+		}
+		kb = normalizeIDs(kb)
+		fmt.Printf("🔎 %s ha %d vicini\n", next, len(kb))
+
+		// target presente?
+		for _, n := range kb {
+			if n == targetNode {
+				fmt.Printf("✅ %s conosce %s — invio Ping…\n", next, targetNode)
+				if err := SendPing(next, targetNode); err != nil {
+					fmt.Printf("⚠️  Ping fallito: %v\n", err)
+				}
+				return
+			}
+		}
+
+		// accumula nuovi candidati
+		addCand(kb)
+
+		// controllo progresso
+		if bestDist == nil || nextD.Cmp(bestDist) < 0 {
+			bestDist = nextD
+			stagnate = 0
+		} else {
+			stagnate++
+			if stagnate >= 2 {
+				fmt.Println("⛔ Nessun miglioramento di distanza — arresto.")
+				return
+			}
+		}
+	}
+	fmt.Println("⛔ Max hop raggiunto senza contattare il target.")
+}
+
+// Se GetKBucket ti manda esadecimale (20 byte = 40 char), decodifichiamo in "nodeX".
+func normalizeIDs(in []string) []string {
+	out := make([]string, 0, len(in))
+	for _, s := range in {
+		if len(s) == 40 { // sembra hex (20 byte)
+			if b, err := hex.DecodeString(s); err == nil {
+				s = string(bytes.TrimRight(b, "\x00"))
+			}
+		}
+		out = append(out, s)
+	}
+	return out
+}
+
+func SendPing(fromID, targetName string) error {
+	// riusa la tua funzione che risolve l’endpoint del nodo (host:port)
+	addr, err := resolveStartHostPort(targetName) // es: "localhost:8004"
+	if err != nil {
+		return err
+	}
+
+	// connessione con timeout e block (meglio feedback chiaro sulle reachability)
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	defer cancel()
+	conn, err := grpc.DialContext(ctx, addr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(),
+		grpc.WithReturnConnectionError(),
+	)
+	if err != nil {
+		return fmt.Errorf("dial %s: %w", addr, err)
+	}
+	defer conn.Close()
+
+	client := pb.NewKademliaClient(conn)
+	resp, err := client.Ping(ctx, &pb.PingReq{
+		From: &pb.Node{Id: fromID, Host: fromID, Port: 0}, // meta: Host/Port opzionali
+	})
+	if err != nil {
+		return fmt.Errorf("Ping %s: %w", targetName, err)
+	}
+
+	fmt.Printf("PONG da %s (ok=%v, t=%d)\n", resp.GetNodeId(), resp.GetOk(), resp.GetUnixMs())
+	// (opzionale) aggiorna la routing table locale di X con Y, perché ha risposto:
+	// UpdateBucketLocal(targetName)
+
+	return nil
 }

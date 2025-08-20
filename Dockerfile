@@ -14,7 +14,7 @@ COPY . .
 ENV GO111MODULE=on
 
 # 4) Build dell'intero package cmd
-RUN go build -o /node ./cmd
+RUN go build -o /node ./cmd/container
 
 # ---- Stage runtime ----
 FROM alpine:3.20

@@ -55,6 +55,15 @@ message GetKBucketResp {
 }
 
 
+message PingReq {
+  Node from = 1;        // chi sta pingando (X)
+}
+
+message PingRes {
+  bool   ok      = 1;   // true = sono vivo
+  string node_id = 2;   // mio id (Y)
+  int64  unix_ms = 3;   // timestamp server
+}
 
 
 // ---- Servizio ----
@@ -63,5 +72,6 @@ service Kademlia {
   rpc GetNodeList (GetNodeListReq) returns (GetNodeListRes);
   rpc LookupNFT   (LookupNFTReq)   returns (LookupNFTRes);
   rpc GetKBucket(GetKBucketReq) returns (GetKBucketResp);
+  rpc Ping (PingReq) returns (PingRes);
 
 }
