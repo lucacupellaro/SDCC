@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	pb "kademlia-nft/proto/kad"
+	"path/filepath"
 
 	"kademlia-nft/logica"
 
@@ -15,6 +16,13 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/docker/docker/api/types"
+
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/client"
+	"github.com/docker/go-connections/nat"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -43,7 +51,7 @@ Benvenuto! Seleziona un'operazione:
   2) Ping (X->Y)
   3) Cerca un NFT  
   4) Aggiungi un NFT
-  5) Mostra collegamenti (edges)
+  5) Aggiungi un nodo
   6) Esci
 `)
 
@@ -516,5 +524,63 @@ func SendPing(fromID, targetName string) error {
 	// (opzionale) aggiorna la routing table locale di X con Y, perché ha risposto:
 	// UpdateBucketLocal(targetName)
 
+	return nil
+}
+
+func AddNode(ctx context.Context, nodeName, seederAddr, hostPort string) error {
+	cli, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		return err
+	}
+	defer cli.Close()
+
+	// percorso assoluto della cartella locale
+	hostDataPath, err := filepath.Abs("./data/" + nodeName)
+	if err != nil {
+		return err
+	}
+
+	// Configurazione del container
+	config := &container.Config{
+		Image: "kademlia-nft-node5", // immagine generica che hai buildato
+		Env: []string{
+			"NODE_ID=" + nodeName,
+			"DATA_DIR=/data",
+			"SEEDER_ADDR=" + seederAddr,
+		},
+		ExposedPorts: nat.PortSet{
+			"8000/tcp": struct{}{},
+		},
+	}
+
+	hostConfig := &container.HostConfig{
+		Binds: []string{
+			fmt.Sprintf("%s:/data", hostDataPath), // bind mount con path assoluto
+		},
+		PortBindings: nat.PortMap{
+			"8000/tcp": []nat.PortBinding{
+				{HostIP: "0.0.0.0", HostPort: hostPort},
+			},
+		},
+	}
+
+	networkingConfig := &network.NetworkingConfig{
+		EndpointsConfig: map[string]*network.EndpointSettings{
+			"kadnet": {}, // collega il container alla rete kadnet
+		},
+	}
+
+	// Crea il container
+	resp, err := cli.ContainerCreate(ctx, config, hostConfig, networkingConfig, nil, nodeName)
+	if err != nil {
+		return err
+	}
+
+	// Avvia il container
+	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+		return err
+	}
+
+	fmt.Printf("✅ Nodo %s avviato sulla porta %s\n", nodeName, hostPort)
 	return nil
 }

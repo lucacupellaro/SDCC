@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"kademlia-nft/internal/ui"
 	"kademlia-nft/logica"
@@ -152,6 +153,18 @@ func main() {
 
 		}
 
+	}
+	if choice == 5 {
+
+		fmt.Println("Aggiungo un nuovo nodo")
+
+		ctx := context.Background()
+
+		// esempio: aggiunge node12 collegato al seeder node1
+		if err := ui.AddNode(ctx, "node12", "node1:8000", "8012"); err != nil {
+			fmt.Println("Errore:", err)
+			os.Exit(1)
+		}
 	}
 
 }
