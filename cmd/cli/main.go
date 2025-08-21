@@ -43,7 +43,7 @@ func main() {
 			}
 		*/
 
-		ui.PingNode("node5", "node7")
+		ui.PingNode("node8", "node5")
 
 	}
 
@@ -79,7 +79,7 @@ func main() {
 		*/
 
 		//------------------------Inizia la ricerca dell'NFT-------------------------------------------//
-		node := "nodo9" // o "node3"
+		node := "nodo6" // o "node3"
 		name := "Lift-off Pass"
 
 		if err := ui.LookupNFTOnNodeByName(node, name, 30); err != nil {

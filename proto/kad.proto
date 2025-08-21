@@ -65,6 +65,9 @@ message PingRes {
   int64  unix_ms = 3;   // timestamp server
 }
 
+message UpdateBucketReq { Node contact = 1; }  // “ho visto questo nodo”
+message UpdateBucketRes { bool ok = 1; }
+
 
 // ---- Servizio ----
 service Kademlia {
@@ -73,5 +76,6 @@ service Kademlia {
   rpc LookupNFT   (LookupNFTReq)   returns (LookupNFTRes);
   rpc GetKBucket(GetKBucketReq) returns (GetKBucketResp);
   rpc Ping (PingReq) returns (PingRes);
+  rpc UpdateBucket(UpdateBucketReq) returns (UpdateBucketRes); // NEW
 
 }

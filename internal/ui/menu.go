@@ -40,7 +40,7 @@ func ShowWelcomeMenu() MenuChoice {
 Benvenuto! Seleziona un'operazione:
 
   1) Elenca nodi
-  2) Mostra k-bucket di un nodo
+  2) Ping (X->Y)
   3) Cerca un NFT  
   4) Aggiungi un NFT
   5) Mostra collegamenti (edges)

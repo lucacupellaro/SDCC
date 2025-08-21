@@ -6,14 +6,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	pb "kademlia-nft/proto/kad"
 	"log"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
-
-	pb "kademlia-nft/proto/kad"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -178,17 +177,93 @@ func (s *KademliaServer) GetKBucket(ctx context.Context, req *pb.GetKBucketReq) 
 }
 
 func (s *KademliaServer) Ping(ctx context.Context, req *pb.PingReq) (*pb.PingRes, error) {
+	if f := req.GetFrom(); f != nil && f.GetId() != "" {
+		log.Printf("[Ping] ricevuto From.Id=%q", f.GetId())
+		if err := TouchContact(f.GetId()); err != nil {
+			log.Printf("[Ping] TouchContact(%q) FAILED: %v", f.GetId(), err)
+		} else {
+			log.Printf("[Ping] TouchContact(%q) OK (bucket aggiornato)", f.GetId())
+		}
+	} else {
+		log.Printf("[Ping] req.From mancante o vuoto: nessun update del bucket")
+	}
+
 	self := os.Getenv("NODE_ID")
 	if self == "" {
 		self = "unknown"
 	}
+	return &pb.PingRes{Ok: true, NodeId: self, UnixMs: time.Now().UnixMilli()}, nil
+}
 
-	// (opzionale ma consigliato per Kademlia) aggiorna la tua routing table con req.From
-	// UpdateBucket(req.From.Id)  // TODO: la tua funzione di update+persist su kbucket.json
+func (s *KademliaServer) UpdateBucket(ctx context.Context, req *pb.UpdateBucketReq) (*pb.UpdateBucketRes, error) {
+	c := req.GetContact()
+	if c == nil || c.GetId() == "" {
+		return &pb.UpdateBucketRes{Ok: false}, nil
+	}
+	if err := TouchContact(c.GetId()); err != nil {
+		return nil, err
+	}
+	return &pb.UpdateBucketRes{Ok: true}, nil
+}
 
-	return &pb.PingRes{
-		Ok:     true,
-		NodeId: self,
-		UnixMs: time.Now().UnixMilli(),
-	}, nil
+// ---------------------
+// calcola l’hex da "nodeX" con la tua stessa regola dei 20 byte
+func idHexFromNodeID(nodeID string) string {
+	b := NewIDFromToken(nodeID, 20)
+	return hex.EncodeToString(b)
+}
+
+const (
+	kBucketPath = "/data/kbucket.json"
+	kCapacity   = 8
+)
+
+type kbucketFile struct {
+	NodeID    string   `json:"node_id"`
+	BucketHex []string `json:"bucket_hex"`
+	SavedAt   string   `json:"saved_at"`
+}
+
+func loadKBucket(path string) (kb kbucketFile, _ error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return kb, err
+	}
+	err = json.Unmarshal(b, &kb)
+	return kb, err
+}
+
+func saveKBucket(path string, kb kbucketFile) error {
+	kb.SavedAt = time.Now().UTC().Format(time.RFC3339)
+	j, _ := json.MarshalIndent(kb, "", "  ")
+	return os.WriteFile(path, j, 0o644)
+}
+
+func touchContactHex(kb *kbucketFile, hexID string) {
+	// rimuovi se presente
+	out := kb.BucketHex[:0]
+	for _, h := range kb.BucketHex {
+		if h != hexID {
+			out = append(out, h)
+		}
+	}
+	kb.BucketHex = out
+
+	// append in coda, con capacità
+	if len(kb.BucketHex) < kCapacity {
+		kb.BucketHex = append(kb.BucketHex, hexID)
+		return
+	}
+	// bucket pieno: drop LRU (pos 0) e append nuovo
+	kb.BucketHex = append(kb.BucketHex[1:], hexID)
+}
+
+func TouchContact(nodeID string) error {
+	hexID := idHexFromNodeID(nodeID)
+	kb, err := loadKBucket(kBucketPath)
+	if err != nil {
+		return err
+	}
+	touchContactHex(&kb, hexID)
+	return saveKBucket(kBucketPath, kb)
 }

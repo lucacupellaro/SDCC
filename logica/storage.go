@@ -478,6 +478,7 @@ func HexFileNameFromName(nameBytes []byte) string {
 	}
 */
 func (s *KademliaServer) LookupNFT(ctx context.Context, req *pb.LookupNFTReq) (*pb.LookupNFTRes, error) {
+
 	dataDir := strings.TrimSpace(os.Getenv("DATA_DIR"))
 	if dataDir == "" {
 		dataDir = "/data"
