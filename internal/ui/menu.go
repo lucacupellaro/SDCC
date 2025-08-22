@@ -542,7 +542,7 @@ func AddNode(ctx context.Context, nodeName, seederAddr, hostPort string) error {
 
 	// Configurazione del container
 	config := &container.Config{
-		Image: "kademlia-nft-node5", // immagine generica che hai buildato
+		Image: "kademlia-nft-node", // immagine generica che hai buildato
 		Env: []string{
 			"NODE_ID=" + nodeName,
 			"DATA_DIR=/data",
@@ -566,7 +566,7 @@ func AddNode(ctx context.Context, nodeName, seederAddr, hostPort string) error {
 
 	networkingConfig := &network.NetworkingConfig{
 		EndpointsConfig: map[string]*network.EndpointSettings{
-			"kadnet": {}, // collega il container alla rete kadnet
+			"kademlia-nft_kadnet": {},
 		},
 	}
 
