@@ -156,12 +156,22 @@ func main() {
 	}
 	if choice == 5 {
 
+		var nodi []string
+		var biggerNode string
+
 		fmt.Println("Aggiungo un nuovo nodo")
+
+		nodi, err := ui.ListActiveComposeServices("kademlia-nft")
+		if err != nil {
+			log.Fatal("Errore recupero nodi:", err)
+		}
+
+		biggerNode = ui.BiggerNodes(nodi)
 
 		ctx := context.Background()
 
 		// esempio: aggiunge node12 collegato al seeder node1
-		if err := ui.AddNode(ctx, "node12", "node1:8000", "8012"); err != nil {
+		if err := ui.AddNode(ctx, biggerNode, "node1:8000", "8012"); err != nil {
 			fmt.Println("Errore:", err)
 			os.Exit(1)
 		}

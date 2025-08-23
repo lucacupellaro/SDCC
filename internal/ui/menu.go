@@ -5,15 +5,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	"fmt"
+
 	pb "kademlia-nft/proto/kad"
 	"path/filepath"
 
+	"fmt"
 	"kademlia-nft/logica"
-
 	"math/big"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -583,4 +584,25 @@ func AddNode(ctx context.Context, nodeName, seederAddr, hostPort string) error {
 
 	fmt.Printf("✅ Nodo %s avviato sulla porta %s\n", nodeName, hostPort)
 	return nil
+}
+
+func BiggerNodes(nodi []string) string {
+	var maxID = -1
+
+	for _, n := range nodi {
+		if strings.HasPrefix(n, "node") {
+			idStr := strings.TrimPrefix(n, "node")
+			id, err := strconv.Atoi(idStr)
+			if err != nil {
+				continue
+			}
+
+			if id > maxID {
+				maxID = id
+			}
+		}
+	}
+
+	// ritorna il nuovo nodo con ID incrementato
+	return "node" + strconv.Itoa(maxID+1)
 }
