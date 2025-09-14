@@ -494,7 +494,7 @@ func normalizeIDs(in []string) []string {
 }
 
 func SendPing(fromID, targetName string) error {
-	// riusa la tua funzione che risolve l’endpoint del nodo (host:port)
+
 	addr, err := resolveStartHostPort(targetName) // es: "localhost:8004"
 	if err != nil {
 		return err

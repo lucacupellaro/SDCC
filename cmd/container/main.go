@@ -53,9 +53,12 @@ func main() {
 
 		fmt.Printf("NFT 0z %s\n", colName[0])
 
-		listNFTId := logica.GenerateBytesOfAllNfts(colName)
+		//prev listNFTId := logica.GenerateBytesOfAllNfts(colName)
+		listNFTId := logica.GenerateBytesOfAllNftsSHA1(colName)
+		fmt.Printf("Primo NFT: %s\n", colName[0])
+		fmt.Printf("Primo ID  : %x\n", listNFTId[0])
 
-		fmt.Printf("NFT id %x: NFT name: %s\n", listNFTId[0], logica.DecodeID(listNFTId[0]))
+		fmt.Printf("NFT id %x:\n", listNFTId[0])
 
 		// recuper gli ID dei container
 		rawNodes := os.Getenv("NODES")
@@ -64,13 +67,11 @@ func main() {
 			return
 		}
 
-		parts := strings.Split(rawNodes, ",")
-		iDnew := make([][]byte, len(parts))
-		for i, p := range parts {
-			//fmt.Println("Nodo trovato:", p)
-			iDnew[i] = logica.NewIDFromToken(p, 20)
+		var dir *logica.ByteMapping
 
-		}
+		parts := strings.Split(rawNodes, ",")
+
+		dir = logica.BuildByteMappingSHA1(parts)
 
 		//fissato nft quindi per ogni nft , crei unafunzione che per ogni nft scorre tutti e e 10 gli i d dei nodi e li assegna ai 2/3 pi vicini)
 
@@ -78,13 +79,15 @@ func main() {
 
 		rows := csvAll[1:] // salta header
 		nfts := make([]logica.NFT, 0, len(rows))
-		for _, row := range rows {
+
+		for i, row := range rows {
+
 			if len(row) < 17 {
 				continue
 			} // safety
 
 			name := strings.TrimSpace(row[1])
-			key := logica.NewIDFromToken(name, 20) // ID dal Name (come vuoi tu)
+			//key := logica.NewIDFromToken(name, 20) // ID dal Name (come vuoi tu)
 
 			col := func(k int) string {
 				if k >= 0 && k < len(row) {
@@ -92,6 +95,10 @@ func main() {
 				}
 				return ""
 			}
+
+			assigned := logica.ClosestNodesForNFTWithDir(listNFTId[i], dir, 2)
+			var nodiSelected []string
+			nodiSelected = append(nodiSelected, assigned[0].Key, assigned[1].Key)
 
 			nfts = append(nfts, logica.NFT{
 				Index:             col(0),
@@ -112,10 +119,12 @@ func main() {
 				Website:           col(15),
 				Logo:              col(16),
 
-				TokenID:            key,
-				AssignedNodesToken: logica.AssignNFTToNodes(key, iDnew, 2),
+				TokenID:            listNFTId[i],
+				AssignedNodesToken: nodiSelected,
 			})
 		}
+
+		fmt.Printf("NFT assegnati: %d\n", len(nfts))
 
 		for _, h := range parts {
 			if err := logica.WaitReady(h, 12*time.Second); err != nil {
@@ -129,10 +138,10 @@ func main() {
 
 		for j := 0; j < len(nfts); j++ {
 			var nodi []string
-			nodi = append(nodi, logica.DecodeID(nfts[j].AssignedNodesToken[0]))
-			nodi = append(nodi, logica.DecodeID(nfts[j].AssignedNodesToken[1]))
+			nodi = append(nodi, nfts[j].AssignedNodesToken[0])
+			nodi = append(nodi, nfts[j].AssignedNodesToken[1])
 
-			if err := logica.StoreNFTToNodes(nfts[j], logica.DecodeID(nfts[j].TokenID), nfts[j].Name, nodi, 24*3600); err != nil {
+			if err := logica.StoreNFTToNodes(nfts[j], nfts[j].TokenID, nfts[j].Name, nodi, 24*3600); err != nil {
 				fmt.Println("Errore:", err)
 				continue
 			}

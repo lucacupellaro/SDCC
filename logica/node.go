@@ -60,8 +60,14 @@ func RemoveAndSortMe(bucket [][]byte, selfId []byte) [][]byte {
 
 	// 2. Riordina per distanza XOR dal nodo corrente (selfID)
 	sort.Slice(bucket, func(i, j int) bool {
-		distI := XOR(selfId, bucket[i])
-		distJ := XOR(selfId, bucket[j])
+		var err1 error
+		var err2 error
+		distI, err1 := XOR(selfId, bucket[i])
+		distJ, err2 := XOR(selfId, bucket[j])
+		if err1 != nil || err2 != nil {
+			log.Printf("WARN: errore calcolo distanza XOR: %v, %v", err1, err2)
+			return false
+		}
 		return LessThan(distI, distJ)
 	})
 

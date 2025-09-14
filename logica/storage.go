@@ -3,9 +3,11 @@ package logica
 import (
 	"bytes"
 	"context"
+	"crypto/sha1"
 	"encoding/csv"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -42,7 +44,7 @@ type NFT struct {
 	Logo              string
 
 	TokenID            []byte
-	AssignedNodesToken [][]byte
+	AssignedNodesToken []string
 }
 
 func ReadCsv2(path string) [][]string {
@@ -85,17 +87,18 @@ func DecodeID(b []byte) string {
 	return string(bytes.TrimRight(b, "\x00"))
 }
 
-func XOR(a, b []byte) []byte {
-	// assume stesse lunghezze; se no, usa la min
-	n := len(a)
-	if len(b) < n {
-		n = len(b)
+func XOR(a, b []byte) ([]byte, error) {
+	if a == nil || b == nil {
+		return nil, fmt.Errorf("nil input")
 	}
-	out := make([]byte, n)
-	for i := 0; i < n; i++ {
+	if len(a) != len(b) {
+		return nil, fmt.Errorf("length mismatch: %d vs %d", len(a), len(b))
+	}
+	out := make([]byte, len(a))
+	for i := range a {
 		out[i] = a[i] ^ b[i]
 	}
-	return out
+	return out, nil
 }
 
 // confronto lessicografico: true se a < b
@@ -121,10 +124,193 @@ func GenerateBytesOfAllNfts(list []string) [][]byte {
 	ids := make([][]byte, len(list))
 	for i, s := range list {
 		ids[i] = NewIDFromToken(s, 20) // 20 bytes = 160 bit
+
 	}
 	return ids
 }
 
+func GenerateBytesOfAllNftsSHA1(list []string) [][]byte {
+	ids := make([][]byte, len(list))
+	for i, s := range list {
+		sum := sha1.Sum([]byte(s)) // [20]byte
+		b := make([]byte, 20)
+		copy(b, sum[:])
+		ids[i] = b
+	}
+	return ids
+}
+
+// Mapping tra stringhe (es. nomi/addr) e ID a 20 byte (SHA-1)
+type ByteMapping struct {
+	List  []string          // lista pulita (trim, dedup, ordine preservato)
+	IDs   [][]byte          // ID corrispondenti (len==len(List)), 20 byte ciascuno
+	ByKey map[string][]byte // lookup: key -> ID (20 byte)
+	ByHex map[string]string // lookup: hex(ID) -> key (utile per log/JSON)
+}
+
+// BuildByteMappingSHA1: crea il mapping pulendo spazi ed eliminando duplicati.
+func BuildByteMappingSHA1(input []string) *ByteMapping {
+	seen := make(map[string]struct{}, len(input))
+	out := &ByteMapping{
+		List:  make([]string, 0, len(input)),
+		IDs:   make([][]byte, 0, len(input)),
+		ByKey: make(map[string][]byte, len(input)),
+		ByHex: make(map[string]string, len(input)),
+	}
+
+	for _, raw := range input {
+		key := strings.TrimSpace(raw)
+		if key == "" {
+			continue
+		}
+		if _, dup := seen[key]; dup {
+			continue
+		}
+		seen[key] = struct{}{}
+
+		sum := sha1.Sum([]byte(key)) // [20]byte
+		id := make([]byte, 20)
+		copy(id, sum[:])
+
+		out.List = append(out.List, key)
+		out.IDs = append(out.IDs, id)
+		out.ByKey[key] = id
+		out.ByHex[hex.EncodeToString(id)] = key
+	}
+	return out
+}
+
+type NodePick struct {
+	Key    string // es. "nodo1" o "node3:8000"
+	SHA    []byte // 20 byte
+	SHAHex string // esadecimale (40 char)
+}
+
+// key = SHA-1 (20B) dell'NFT, dir = rubrica nodi (key->SHA-1), k = quanti nodi vuoi
+func ClosestNodesForNFTWithDir(key []byte, dir *ByteMapping, k int) []NodePick {
+	if dir == nil || len(key) == 0 || k <= 0 || len(dir.List) == 0 {
+		return nil
+	}
+	L := len(key)
+
+	type cand struct {
+		idx  int
+		dist []byte
+	}
+	cands := make([]cand, 0, len(dir.List))
+
+	// prepara distanze XOR
+	for i, name := range dir.List {
+		id := dir.ByKey[name]
+		if id == nil || len(id) != L {
+			continue
+		}
+		if bytes.Equal(id, key) { // skip self
+			continue
+		}
+		d := make([]byte, L)
+		for j := 0; j < L; j++ {
+			d[j] = key[j] ^ id[j]
+		}
+		cands = append(cands, cand{idx: i, dist: d})
+	}
+	if len(cands) == 0 {
+		return nil
+	}
+
+	// ordina per distanza XOR crescente (+ tie-break su ID grezzo)
+	sort.Slice(cands, func(i, j int) bool {
+		if c := bytes.Compare(cands[i].dist, cands[j].dist); c != 0 {
+			return c < 0
+		}
+		return bytes.Compare(dir.IDs[cands[i].idx], dir.IDs[cands[j].idx]) < 0
+	})
+
+	if k > len(cands) {
+		k = len(cands)
+	}
+
+	// costruisci output
+	out := make([]NodePick, k)
+	for n := 0; n < k; n++ {
+		i := cands[n].idx
+		id := dir.IDs[i]
+		idCopy := make([]byte, len(id))
+		copy(idCopy, id)
+		out[n] = NodePick{
+			Key:    dir.List[i],
+			SHA:    idCopy,
+			SHAHex: hex.EncodeToString(idCopy),
+		}
+	}
+	return out
+}
+
+func AssignNFTToNodes(key []byte, nodes [][]byte, k int) [][]byte {
+	if key == nil || len(key) == 0 || len(nodes) == 0 || k <= 0 {
+		return nil
+	}
+	L := len(key)
+
+	// 1) Dedup + filtri (len==L, !=self), copia difensiva
+	uniq := make([][]byte, 0, len(nodes))
+	seen := make(map[string]struct{}, len(nodes))
+	self := string(key)
+
+	for _, nid := range nodes {
+		if nid == nil || len(nid) != L {
+			continue
+		}
+		s := string(nid) // ok con byte arbitrari
+		if s == self {
+			continue // niente self
+		}
+		if _, ok := seen[s]; ok {
+			continue
+		}
+		seen[s] = struct{}{}
+		buf := make([]byte, L)
+		copy(buf, nid)
+		uniq = append(uniq, buf)
+	}
+	if len(uniq) == 0 {
+		return nil
+	}
+	if k > len(uniq) {
+		k = len(uniq)
+	}
+
+	// 2) Prepara (id, dist=key XOR id)
+	type pair struct {
+		id   []byte
+		dist []byte
+	}
+	pairs := make([]pair, len(uniq))
+	for i, id := range uniq {
+		d := make([]byte, L)
+		for j := 0; j < L; j++ {
+			d[j] = key[j] ^ id[j]
+		}
+		pairs[i] = pair{id: id, dist: d}
+	}
+
+	// 3) Ordina per distanza XOR, tie-break su ID
+	sort.Slice(pairs, func(i, j int) bool {
+		if c := bytes.Compare(pairs[i].dist, pairs[j].dist); c != 0 {
+			return c < 0
+		}
+		return bytes.Compare(pairs[i].id, pairs[j].id) < 0
+	})
+
+	// 4) Primi k
+	out := make([][]byte, k)
+	for i := 0; i < k; i++ {
+		out[i] = pairs[i].id
+	}
+	return out
+}
+
+/*
 // restituisce i k nodeID più vicini alla chiave (distanza XOR, ordinata crescente)
 func AssignNFTToNodes(key []byte, nodes [][]byte, k int) [][]byte {
 	if k <= 0 || len(nodes) == 0 {
@@ -153,15 +339,17 @@ func AssignNFTToNodes(key []byte, nodes [][]byte, k int) [][]byte {
 	}
 	return out
 }
-
+*/
 // StoreNFTToNodes invia lo stesso NFT a tutti i nodi indicati.
 // Ritorna nil se TUTTE le store vanno a buon fine; altrimenti un error descrittivo.
-func StoreNFTToNodes(nft NFT, tokenID string, name string, nodes []string, ttlSecs int32) error {
-	// chiave Kademlia a 20 byte (coerente con il resto del tuo codice)
-	key := NewIDFromToken(tokenID, 20)
+func StoreNFTToNodes(nft NFT, tokenID []byte, name string, nodes []string, ttlSecs int32) error {
+	if len(tokenID) == 0 {
+		return errors.New("tokenID vuoto")
+	}
 
-	// payload (serializzazione minimale dell'NFT)
-	payload, _ := json.Marshal(struct {
+	tokenIDStr := fmt.Sprintf("%x.json", tokenID)
+
+	payload, err := json.Marshal(struct {
 		TokenID string `json:"token_id"`
 		Name    string `json:"name"`
 
@@ -183,7 +371,7 @@ func StoreNFTToNodes(nft NFT, tokenID string, name string, nodes []string, ttlSe
 		Website           string `json:"website,omitempty"`
 		Logo              string `json:"logo,omitempty"`
 	}{
-		TokenID:           hex.EncodeToString(key),
+		TokenID:           tokenIDStr,
 		Name:              name,
 		Index:             nft.Index,
 		Volume:            nft.Volume,
@@ -202,17 +390,35 @@ func StoreNFTToNodes(nft NFT, tokenID string, name string, nodes []string, ttlSe
 		Website:           nft.Website,
 		Logo:              nft.Logo,
 	})
+	if err != nil {
+		return fmt.Errorf("marshal payload: %w", err)
+	}
 
-	var errs []string
-
-	for _, host := range nodes {
-		if strings.TrimSpace(host) == "" {
-			errs = append(errs, "host vuoto")
+	// Dedup & normalizzazione address
+	seen := make(map[string]struct{}, len(nodes))
+	addrs := make([]string, 0, len(nodes))
+	fmt.Printf("Nodes da inviare: %d\n", len(nodes))
+	for _, h := range nodes {
+		h = strings.TrimSpace(h)
+		if h == "" {
 			continue
 		}
-
-		addr := fmt.Sprintf("%s:%d", host, 8000)
-
+		// se manca la porta, usa 8000
+		if _, _, err := net.SplitHostPort(h); err != nil {
+			h = net.JoinHostPort(h, "8000")
+		}
+		if _, ok := seen[h]; ok {
+			continue
+		}
+		seen[h] = struct{}{}
+		addrs = append(addrs, h)
+	}
+	if len(addrs) == 0 {
+		return errors.New("nessun nodo valido")
+	}
+	fmt.Printf("n indirizzi: %d\n", len(addrs))
+	var errs []string
+	for _, addr := range addrs {
 		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
 			errs = append(errs, fmt.Sprintf("dial %s: %v", addr, err))
@@ -223,25 +429,24 @@ func StoreNFTToNodes(nft NFT, tokenID string, name string, nodes []string, ttlSe
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		_, callErr := client.Store(ctx, &pb.StoreReq{
 			From:    &pb.Node{Id: "seeder", Host: "seeder", Port: 8000},
-			Key:     &pb.Key{Key: key},
-			Value:   &pb.NFTValue{Bytes: payload},
-			TtlSecs: ttlSecs, // es: 24*3600. Metti 0 se non usi TTL.
+			Key:     &pb.Key{Key: tokenID},        // *** bytes RAW (20B), niente ascii-hex ***
+			Value:   &pb.NFTValue{Bytes: payload}, // unico file JSON lato server
+			TtlSecs: ttlSecs,
 		})
 		cancel()
 		_ = conn.Close()
 
 		if callErr != nil {
-			errs = append(errs, fmt.Sprintf("Store(%s): %v", host, callErr))
+			errs = append(errs, fmt.Sprintf("Store(%s): %v", addr, callErr))
 			continue
 		}
-
-		fmt.Printf("✅  NFT inviato %q su %s\n", tokenID, host)
+		//fmt.Printf("✅ NFT %s inviato a %s\n", hex.EncodeToString(tokenID), addr)
 	}
 
 	if len(errs) > 0 {
 		return fmt.Errorf("alcune Store sono fallite: %s", strings.Join(errs, "; "))
 	}
-	return nil // tutto ok
+	return nil
 }
 
 // Se CLI su host: localhost:8000+n ; se CLI in Docker: nodeN:8000
@@ -369,8 +574,8 @@ func (s *KademliaServer) Store(ctx context.Context, req *pb.StoreReq) (*pb.Store
 	filePath := filepath.Join(dataDir, fileName)
 
 	// (facoltativo) log utile per conferma
-	abs, _ := filepath.Abs(filePath)
-	log.Printf("✅ Salvato NFT in %s (abs=%s)", filePath, abs)
+	//abs, _ := filepath.Abs(filePath)
+	//log.Printf("✅ Salvato NFT in %s (abs=%s)", filePath, abs)
 
 	if err := os.WriteFile(filePath, req.Value.Bytes, 0644); err != nil {
 		return nil, fmt.Errorf("scrittura file %s: %w", filePath, err)

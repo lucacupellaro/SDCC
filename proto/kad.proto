@@ -76,6 +76,6 @@ service Kademlia {
   rpc LookupNFT   (LookupNFTReq)   returns (LookupNFTRes);
   rpc GetKBucket(GetKBucketReq) returns (GetKBucketResp);
   rpc Ping (PingReq) returns (PingRes);
-  rpc UpdateBucket(UpdateBucketReq) returns (UpdateBucketRes); // NEW
+  rpc UpdateBucket(UpdateBucketReq) returns (UpdateBucketRes); 
 
 }
