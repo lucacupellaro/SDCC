@@ -83,6 +83,13 @@ func NewIDFromToken(tokenID string, size int) []byte {
 	return padded
 }
 
+func Sha1ID(tokenID string) []byte {
+	s := sha1.Sum([]byte(tokenID)) // [20]byte
+	b := make([]byte, sha1.Size)
+	copy(b, s[:])
+	return b // esattamente 20 byte
+}
+
 func DecodeID(b []byte) string {
 	return string(bytes.TrimRight(b, "\x00"))
 }
