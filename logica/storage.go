@@ -16,7 +16,9 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
+	"github.com/gogo/protobuf/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -404,7 +406,7 @@ func StoreNFTToNodes(nft NFT, tokenID []byte, name string, nodes []string, ttlSe
 	// Dedup & normalizzazione address
 	seen := make(map[string]struct{}, len(nodes))
 	addrs := make([]string, 0, len(nodes))
-	fmt.Printf("Nodes da inviare: %d\n", len(nodes))
+	//fmt.Printf("Nodes da inviare: %d\n", len(nodes))
 	for _, h := range nodes {
 		h = strings.TrimSpace(h)
 		if h == "" {
@@ -423,7 +425,7 @@ func StoreNFTToNodes(nft NFT, tokenID []byte, name string, nodes []string, ttlSe
 	if len(addrs) == 0 {
 		return errors.New("nessun nodo valido")
 	}
-	fmt.Printf("n indirizzi: %d\n", len(addrs))
+	//fmt.Printf("n indirizzi: %d\n", len(addrs))
 	var errs []string
 	for _, addr := range addrs {
 		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -651,44 +653,112 @@ func HexFileNameFromName(nameBytes []byte) string {
 	return fmt.Sprintf("%x.json", fixed)
 }
 
-/*
-	func (s *KademliaServer) LookupNFT(ctx context.Context, req *pb.LookupNFTReq) (*pb.LookupNFTRes, error) {
-		dataDir := strings.TrimSpace(os.Getenv("DATA_DIR"))
-		if dataDir == "" {
-			dataDir = "/data"
+func (s *KademliaServer) LookupNFT(ctx context.Context, req *pb.LookupNFTReq) (*pb.LookupNFTRes, error) {
+	dataDir := strings.TrimSpace(os.Getenv("DATA_DIR"))
+	if dataDir == "" {
+		dataDir = "/data"
+	}
+
+	// Chiave in HEX per log e filename
+	keyRaw := req.GetKey().GetKey()
+	keyHex := strings.ToLower(hex.EncodeToString(keyRaw))
+	fileName := HexFileNameFromName(keyRaw) // passa i bytes, NON string(keyRaw)
+	filePath := filepath.Join(dataDir, fileName)
+
+	log.Printf("[SERVER %s] LookupNFT: keyHex='%s' → file='%s'",
+		os.Getenv("NODE_ID"), keyHex, fileName)
+
+	// --- Present on this node?
+	if b, err := os.ReadFile(filePath); err == nil {
+		log.Printf("[SERVER %s] TROVATO %s", os.Getenv("NODE_ID"), fileName)
+		resp := &pb.LookupNFTRes{
+			Found: true,
+			Holder: &pb.Node{
+				Id:   os.Getenv("NODE_ID"), // string UTF-8
+				Host: os.Getenv("NODE_ID"),
+				Port: 8000,
+			},
+			Value: &pb.NFTValue{Bytes: b},
 		}
+		return resp, nil
+	}
 
-		// Qui ci aspettiamo che il client passi il NOME in chiaro (es. "Kreechures")
-		nameRaw := req.GetKey().GetKey()
-		fileName := hexFileNameFromName(nameRaw)
-		filePath := filepath.Join(dataDir, fileName)
-
-		log.Printf("[SERVER %s] LookupNFT: name='%s' → file='%s'",
-			os.Getenv("NODE_ID"), string(nameRaw), fileName)
-
-		// Prova a leggere il file
-		b, err := os.ReadFile(filePath)
-		if err == nil {
-			log.Printf("[SERVER %s] TROVATO %s", os.Getenv("NODE_ID"), fileName)
-			return &pb.LookupNFTRes{
-				Found: true,
-				Holder: &pb.Node{
-					Id:   os.Getenv("NODE_ID"),
-					Host: os.Getenv("NODE_ID"),
-					Port: 8000,
-				},
-				Value:   &pb.NFTValue{Bytes: b}, // il contenuto JSON
-				Nearest: nil,
-			}, nil
-		}
-
-		log.Printf("[SERVER %s] NON trovato: %s (err=%v)", os.Getenv("NODE_ID"), fileName, err)
-		// In questa versione "semplice" non ritorniamo vicini: singolo nodo.
-
-
+	// --- Not found: build nearest from kbucket.json
+	kbPath := filepath.Join(dataDir, "kbucket.json")
+	kbBytes, err := os.ReadFile(kbPath)
+	if err != nil {
+		log.Printf("[SERVER %s] Nessun kbucket.json: %v", os.Getenv("NODE_ID"), err)
 		return &pb.LookupNFTRes{Found: false}, nil
 	}
-*/
+
+	var parsed struct {
+		NodeID    string   `json:"node_id"`
+		BucketHex []string `json:"bucket_hex"`
+		SavedAt   string   `json:"saved_at"`
+	}
+	if err := json.Unmarshal(kbBytes, &parsed); err != nil {
+		log.Printf("[SERVER %s] Errore parse kbucket.json: %v", os.Getenv("NODE_ID"), err)
+		return &pb.LookupNFTRes{Found: false}, nil
+	}
+
+	nearest := make([]*pb.Node, 0, len(parsed.BucketHex))
+	for i, hx := range parsed.BucketHex {
+		hx = strings.TrimSpace(strings.ToLower(hx))
+
+		// Deve essere esattamente 40 char esadecimali (SHA-1)
+		if len(hx) != 40 || !isHex(hx) || !utf8.ValidString(hx) {
+			log.Printf("⚠️ kbucket entry NON valida: idx=%d val=%q len=%d (hex=%v utf8=%v) — SKIP",
+				i, hx, len(hx), isHex(hx), utf8.ValidString(hx))
+			continue
+		}
+
+		nearest = append(nearest, &pb.Node{
+			Id:   hx,   // HEX = ASCII/UTF-8 → OK
+			Host: "",   // opzionale: popola se lo conosci, "" è valido
+			Port: 8000, // non influisce sull'UTF-8
+		})
+	}
+
+	log.Printf("[SERVER %s] Nearest=%d", os.Getenv("NODE_ID"), len(nearest))
+	for i, n := range nearest {
+		log.Printf(" nearest[%d]: id=%q host=%q port=%d (utf8 id=%v host=%v)",
+			i, n.Id, n.Host, n.Port, utf8.ValidString(n.Id), utf8.ValidString(n.Host))
+	}
+
+	// Pre-marshal DIAGNOSTICO: se fallisce, stampa dove
+	resp := &pb.LookupNFTRes{Found: false, Nearest: nearest}
+	if _, err := proto.Marshal(resp); err != nil {
+		log.Printf("💥 PRE-MARSHAL FALLITO: %v", err)
+		for i, n := range nearest {
+			log.Printf(" check nearest[%d]: idBytes=%x hostBytes=%x utf8(id)=%v utf8(host)=%v",
+				i, []byte(n.Id), []byte(n.Host), utf8.ValidString(n.Id), utf8.ValidString(n.Host))
+		}
+		// Ritorna comunque un INTERNAL con messaggio chiaro nei log
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+// helpers
+func isHex(s string) bool {
+	if len(s)%2 == 1 {
+		return false
+	}
+	for _, c := range s {
+		switch {
+		case '0' <= c && c <= '9',
+			'a' <= c && c <= 'f',
+			'A' <= c && c <= 'F':
+			continue
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+/*
 func (s *KademliaServer) LookupNFT(ctx context.Context, req *pb.LookupNFTReq) (*pb.LookupNFTRes, error) {
 
 	dataDir := strings.TrimSpace(os.Getenv("DATA_DIR"))
@@ -740,12 +810,12 @@ func (s *KademliaServer) LookupNFT(ctx context.Context, req *pb.LookupNFTReq) (*
 	}
 
 	var nearest []*pb.Node
+
+
 	for _, hexStr := range parsed.BucketHex {
-		idBytes, _ := hex.DecodeString(hexStr)
-		idStr := string(bytes.TrimRight(idBytes, "\x00"))
 		nearest = append(nearest, &pb.Node{
-			Id:   idStr,
-			Host: idStr,
+			Id:   hexStr,
+			Host: "",
 			Port: 8000,
 		})
 	}
@@ -753,6 +823,7 @@ func (s *KademliaServer) LookupNFT(ctx context.Context, req *pb.LookupNFTReq) (*
 	log.Printf("[SERVER %s] Ritorno %d nodi vicini dal kbucket", os.Getenv("NODE_ID"), len(nearest))
 	return &pb.LookupNFTRes{Found: false, Nearest: nearest}, nil
 }
+*/
 
 func RemoveNode1(nodi *[]string) {
 

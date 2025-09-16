@@ -132,57 +132,16 @@ func resolveStartHostPort(name string) (string, error) {
 	if _, err := fmt.Sscanf(name, "node%d", &n); err != nil || n < 1 || n > 11 {
 		return "", fmt.Errorf("nome nodo non valido: %q", name)
 	}
-	// La CLI corre su HOST → usa la porta mappata localhost:800N
+
 	return fmt.Sprintf("localhost:%d", 8000+n), nil
 }
 
-/*
-	func LookupNFTOnNodeByName(nodeName, nftName string) error {
-		hostPort, err := resolveStartHostPort(nodeName)
-		if err != nil {
-			return err
-		}
-
-		fmt.Printf("🔎 Cerco '%s' su %s\n", nftName, hostPort)
-
-		// inviamo il NOME in chiaro: il server farà pad+hex per costruire <id>.json
-		key := []byte(nftName)
-
-		conn, err := grpc.Dial(hostPort, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		if err != nil {
-			return fmt.Errorf("dial fallito %s: %w", hostPort, err)
-		}
-		defer conn.Close()
-
-		client := pb.NewKademliaClient(conn)
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
-
-		resp, err := client.LookupNFT(ctx, &pb.LookupNFTReq{
-			FromId: "CLI",
-			Key:    &pb.Key{Key: key},
-		})
-		if err != nil {
-			return fmt.Errorf("RPC fallita: %w", err)
-		}
-
-		if !resp.GetFound() {
-			fmt.Println("✖ NFT non trovato su questo nodo")
-			return nil
-		}
-
-		// Stampa il contenuto JSON
-		fmt.Printf("✓ Trovato su nodo %s\n", resp.GetHolder().GetId())
-		fmt.Printf("Contenuto JSON:\n%s\n", string(resp.GetValue().GetBytes()))
-		return nil
-	}
-*/
-func LookupNFTOnNodeByName(startNode, nftName string, maxHops int) error {
+func LookupNFTOnNodeByName(startNode string, str []Pair, nftName string, maxHops int) error {
 	if maxHops <= 0 {
 		maxHops = 15
 	}
 
-	nftID20 := logica.NewIDFromToken(nftName, 20)
+	nftID20 := logica.Sha1ID(nftName)
 	visited := make(map[string]bool)
 	current := startNode
 
@@ -209,7 +168,7 @@ func LookupNFTOnNodeByName(startNode, nftName string, maxHops int) error {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		resp, rpcErr := client.LookupNFT(ctx, &pb.LookupNFTReq{
 			FromId: "CLI",
-			Key:    &pb.Key{Key: []byte(nftName)}, // nome in chiaro; il server fa pad+hex
+			Key:    &pb.Key{Key: nftID20},
 		})
 		cancel()
 		_ = conn.Close()
@@ -252,18 +211,80 @@ func LookupNFTOnNodeByName(startNode, nftName string, maxHops int) error {
 			return nil
 		}
 
+		fmt.Printf("candidati: %s,", candidates)
 		best, err := sceltaNodoPiuVicino(nftID20, candidates)
+
+		strBest := check(best, str)
+
 		if err != nil {
 			fmt.Printf("⚠️  Impossibile scegliere il nodo più vicino: %v — prendo il primo candidato.\n", err)
 			best = candidates[0]
 		}
 
-		fmt.Printf("➡️  Prossimo nodo scelto: %s\n", best)
-		current = best
+		fmt.Printf("➡️  Prossimo nodo scelto: %s\n", strBest)
+		current = strBest
 	}
 
 	fmt.Printf("⛔ Max hop (%d) raggiunto senza trovare '%s'.\n", maxHops, nftName)
 	return nil
+}
+
+type Pair struct {
+	esa  string
+	hash string
+}
+
+/*
+func check(value string, list []Pair) string {
+
+	val := strings.ToLower(strings.TrimSpace(value))
+	for _, v := range list {
+		if strings.ToLower(strings.TrimSpace(v.esa)) == val {
+			decode, err := hexToString(v.esa)
+			if err == nil {
+				return decode
+			}
+		}
+	}
+	return "NOTFOUND"
+
+}
+*/
+
+// Pair: esa = SHA1 hex dell'ID, hash = ID/alias del nodo (es. "node7")
+func check(value string, list []Pair) string {
+	val := strings.ToLower(strings.TrimSpace(value))
+	for _, v := range list {
+		if strings.ToLower(strings.TrimSpace(v.esa)) == val {
+			// RITORNA l'ID del nodo, non decodificare l'hex!
+			return strings.TrimSpace(v.hash)
+		}
+	}
+	return "NOTFOUND"
+}
+
+func hexToString(hexStr string) (string, error) {
+	hexStr = strings.TrimSpace(hexStr)
+	hexStr = strings.TrimPrefix(hexStr, "0x")    // gestisce prefisso "0x"
+	hexStr = strings.ReplaceAll(hexStr, " ", "") // rimuove spazi
+	b, err := hex.DecodeString(hexStr)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+func Reverse2(nodes []string) ([]Pair, error) {
+	//recupero dal file nodi e hash
+
+	out := make([]Pair, 0, len(nodes))
+	for _, n := range nodes {
+
+		idHex := hex.EncodeToString(logica.Sha1ID(n))
+
+		out = append(out, Pair{esa: idHex, hash: n})
+	}
+	return out, nil
 }
 
 // sceltaNodoPiuVicino: XOR distance minima tra nftID20 e ogni nodo (ID a 20 byte).
@@ -272,10 +293,9 @@ func sceltaNodoPiuVicino(nftID20 []byte, nodiVicini []string) (string, error) {
 	var bestDist *big.Int
 
 	for _, idStr := range nodiVicini {
-		// Ricostruisco l'ID a 20 byte come fai ovunque (NewIDFromToken)
-		nidBytes := logica.NewIDFromToken(idStr, 20)
 
-		// XOR byte-wise
+		nidBytes := logica.Sha1ID(idStr)
+
 		distBytes := make([]byte, len(nftID20))
 		for i := range nftID20 {
 			distBytes[i] = nftID20[i] ^ nidBytes[i]

@@ -5,6 +5,7 @@ import (
 	"kademlia-nft/logica"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -73,7 +74,22 @@ func main() {
 
 		dir = logica.BuildByteMappingSHA1(parts)
 
-		//fissato nft quindi per ogni nft , crei unafunzione che per ogni nft scorre tutti e e 10 gli i d dei nodi e li assegna ai 2/3 pi vicini)
+		//------------creazione file-------------------------//
+		base := os.Getenv("DATA_DIR")
+		if base == "" {
+			base = "/data"
+		}
+
+		out := filepath.Join(base, "byte_mapping.json")
+		if err := os.MkdirAll(filepath.Dir(out), 0o755); err != nil {
+			log.Fatalf("mkdir: %v", err)
+		}
+		if err := logica.SaveByteMappingJSON(out, dir); err != nil {
+			log.Fatalf("Errore salvataggio byte_mapping.json: %v", err)
+		}
+		fmt.Printf("✅ File salvato in: %s\n", out)
+
+		//fissato nft quindi per ogni nft , crei unafunzione che per ogni nft scorre tutti e e 10 gli id dei nodi e li assegna ai 2/3 pi vicini)
 
 		fmt.Println("Assegnazione dei k nodeID più vicini agli NFT...")
 
@@ -179,7 +195,7 @@ func main() {
 			log.Fatalf("Errore recupero nodi dal seeder: %v", err)
 		}
 
-		s := strings.Join(nodes, ",") // "n1,n2,n3"
+		s := strings.Join(nodes, ",")
 
 		var dir *logica.ByteMapping
 
@@ -196,7 +212,7 @@ func main() {
 
 		//--------------------Ogni container si trova i k bucket piu vicini e li salva nel proprio volume-------------------//
 
-		Bucket = logica.AssignNFTToNodes(TokenNodo, dir.IDs, 8)
+		Bucket = logica.AssignNFTToNodes(TokenNodo, dir.IDs, 7)
 
 		BucketSort = logica.RemoveAndSortMe(Bucket, TokenNodo)
 

@@ -77,10 +77,22 @@ func main() {
 		*/
 
 		//------------------------Inizia la ricerca dell'NFT-------------------------------------------//
-		node := "nodo6" // o "node3"
+		node := "nodo3"
 		name := "Lift-off Pass"
 
-		if err := ui.LookupNFTOnNodeByName(node, name, 30); err != nil {
+		nodii, err := ui.ListActiveComposeServices("kademlia-nft")
+		if err != nil {
+			log.Fatal("Errore recupero nodi:", err)
+		}
+
+		//ora ho nome dei nodi e hash
+		out, err := ui.Reverse2(nodii)
+		if err != nil {
+			log.Fatal("Errore Reverse2:", err)
+		}
+		//fmt.Printf("Nodi: %v\n", out)
+
+		if err := ui.LookupNFTOnNodeByName(node, out, name, 30); err != nil {
 			fmt.Println("Errore:", err)
 		}
 
