@@ -474,8 +474,7 @@ func resolveAddrForNode(nodeName string) (string, error) {
 	return fmt.Sprintf("localhost:%d", 8000+n), nil
 }
 
-func StoreNFTToNodes2(nft NFT, tokenID, name string, nodes []string, ttlSecs int32) error {
-	key := NewIDFromToken(tokenID, 20)
+func StoreNFTToNodes2(nft NFT, tokenID []byte, name string, nodes []string, ttlSecs int32) error {
 
 	payload, _ := json.Marshal(struct {
 		TokenID           string `json:"token_id"`
@@ -497,7 +496,7 @@ func StoreNFTToNodes2(nft NFT, tokenID, name string, nodes []string, ttlSecs int
 		Website           string `json:"website,omitempty"`
 		Logo              string `json:"logo,omitempty"`
 	}{
-		TokenID:           hex.EncodeToString(key),
+		TokenID:           hex.EncodeToString(tokenID),
 		Name:              name,
 		Index:             nft.Index,
 		Volume:            nft.Volume,
@@ -546,7 +545,7 @@ func StoreNFTToNodes2(nft NFT, tokenID, name string, nodes []string, ttlSecs int
 		ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
 		_, callErr := client.Store(ctx, &pb.StoreReq{
 			From:    &pb.Node{Id: "seeder", Host: "seeder", Port: 0}, // info meta, non usata
-			Key:     &pb.Key{Key: key},
+			Key:     &pb.Key{Key: tokenID},
 			Value:   &pb.NFTValue{Bytes: payload},
 			TtlSecs: ttlSecs,
 		})

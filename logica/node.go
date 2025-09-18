@@ -13,7 +13,9 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
+	"github.com/gogo/protobuf/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -137,49 +139,146 @@ func resolveStartHostPort(name string) (string, error) {
 	return fmt.Sprintf("localhost:%d", 8000+n), nil
 }
 
+/*
+	func (s *KademliaServer) GetKBucket(ctx context.Context, req *pb.GetKBucketReq) (*pb.GetKBucketResp, error) {
+		// 1) Path corretto nel container
+		dataDir := strings.TrimSpace(os.Getenv("DATA_DIR"))
+		if dataDir == "" {
+			dataDir = "/data"
+		}
+		kbPath := filepath.Join(dataDir, "kbucket.json")
+
+		// 2) Leggi file
+		kbBytes, err := os.ReadFile(kbPath)
+		if err != nil {
+			return nil, fmt.Errorf("errore lettura %s: %w", kbPath, err)
+		}
+
+		// 3) Mappa JSON reale
+		var kb struct {
+			NodeID    string   `json:"node_id"`
+			BucketHex []string `json:"bucket_hex"`
+			SavedAt   string   `json:"saved_at"`
+		}
+		if err := json.Unmarshal(kbBytes, &kb); err != nil {
+			return nil, fmt.Errorf("errore parse kbucket.json: %w", err)
+		}
+
+		// 4) Converte hex -> "nodeX"
+		nodes := make([]*pb.Node, 0, len(kb.BucketHex))
+		for _, hx := range kb.BucketHex {
+			b, err := hex.DecodeString(hx)
+			if err != nil || len(b) == 0 {
+				continue
+			}
+			id := string(bytes.TrimRight(b, "\x00")) // es. "node4"
+			if id == "" {
+				continue
+			}
+			nodes = append(nodes, &pb.Node{
+				Id:   id,
+				Host: id,   // così la CLI può usare direttamente l’Id come host
+				Port: 8000, // porta interna del servizio gRPC nei container
+			})
+		}
+
+		return &pb.GetKBucketResp{Nodes: nodes}, nil
+	}
+*/
 func (s *KademliaServer) GetKBucket(ctx context.Context, req *pb.GetKBucketReq) (*pb.GetKBucketResp, error) {
-	// 1) Path corretto nel container
 	dataDir := strings.TrimSpace(os.Getenv("DATA_DIR"))
 	if dataDir == "" {
 		dataDir = "/data"
 	}
-	kbPath := filepath.Join(dataDir, "kbucket.json")
 
-	// 2) Leggi file
-	kbBytes, err := os.ReadFile(kbPath)
-	if err != nil {
-		return nil, fmt.Errorf("errore lettura %s: %w", kbPath, err)
-	}
-
-	// 3) Mappa JSON reale
-	var kb struct {
+	// --- 1) leggi kbucket.json ---
+	type kbucketFile struct {
 		NodeID    string   `json:"node_id"`
 		BucketHex []string `json:"bucket_hex"`
 		SavedAt   string   `json:"saved_at"`
 	}
-	if err := json.Unmarshal(kbBytes, &kb); err != nil {
+	kbPath := filepath.Join(dataDir, "kbucket.json")
+
+	raw, err := os.ReadFile(kbPath)
+	if err != nil {
+		return nil, fmt.Errorf("errore lettura %s: %w", kbPath, err)
+	}
+
+	var kb kbucketFile
+	if err := json.Unmarshal(raw, &kb); err != nil {
 		return nil, fmt.Errorf("errore parse kbucket.json: %w", err)
 	}
 
-	// 4) Converte hex -> "nodeX"
+	// --- 2) normalizza/valida HEX e costruisci i Node ---
 	nodes := make([]*pb.Node, 0, len(kb.BucketHex))
 	for _, hx := range kb.BucketHex {
+		hx = strings.ToLower(strings.TrimSpace(hx))
+		if hx == "" {
+			continue
+		}
+
+		fmt.Printf("GetKBucket: processing hex %q\n", hx)
+		// deve essere hex valido e lungo 20 byte (SHA-1)
 		b, err := hex.DecodeString(hx)
-		if err != nil || len(b) == 0 {
+		if err != nil || len(b) != 20 {
+			log.Printf("GetKBucket: scarto voce non valida (hex/len): %q", hx)
 			continue
 		}
-		id := string(bytes.TrimRight(b, "\x00")) // es. "node4"
-		if id == "" {
-			continue
-		}
+		// hx è ASCII -> UTF-8 valido
 		nodes = append(nodes, &pb.Node{
-			Id:   id,
-			Host: id,   // così la CLI può usare direttamente l’Id come host
-			Port: 8000, // porta interna del servizio gRPC nei container
+			Id:   hx, // esadecimale, quindi sicuro
+			Host: "", // se non lo sai, lascialo vuoto (UTF-8 valido)
+			Port: 0,
 		})
 	}
 
-	return &pb.GetKBucketResp{Nodes: nodes}, nil
+	// --- 3) sanità extra: verifica UTF-8 su tutti i campi string prima di serializzare ---
+	for i, n := range nodes {
+		if !utf8.ValidString(n.Id) {
+			log.Printf("GetKBucket: INVALID UTF-8 in nodes[%d].Id: %q", i, n.Id)
+			// opzionale: converti in hex di byte grezzi, ma qui è già hex
+		}
+		if !utf8.ValidString(n.Host) {
+			log.Printf("GetKBucket: INVALID UTF-8 in nodes[%d].Host: %q", i, n.Host)
+			n.Host = ""
+		}
+	}
+
+	resp := &pb.GetKBucketResp{Nodes: nodes}
+
+	// --- 4) pre-marshal check (così il panic non arriva dal layer gRPC) ---
+	if _, err := proto.Marshal(resp); err != nil {
+		// log utile per capire quale campo è sporco
+		log.Printf("GetKBucket pre-marshal FAILED: %v", err)
+		return nil, fmt.Errorf("internal: invalid UTF-8 in response: %w", err)
+	}
+
+	return resp, nil
+}
+
+// Carica la mappa hex → nodeID da byte_mapping.json prodotto in precedenza
+// Formato atteso: { "list": ["node2","node3",...], "ids_hex": ["<sha1hex(node2)>", ...] }
+func loadHexToNodeIDMap(path string) (map[string]string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var f struct {
+		List   []string `json:"list"`
+		IdsHex []string `json:"ids_hex"`
+	}
+	if err := json.Unmarshal(data, &f); err != nil {
+		return nil, err
+	}
+	m := make(map[string]string, len(f.List))
+	for i := range f.List {
+		hx := strings.ToLower(strings.TrimSpace(f.IdsHex[i]))
+		id := strings.TrimSpace(f.List[i])
+		if hx != "" && id != "" {
+			m[hx] = id
+		}
+	}
+	return m, nil
 }
 
 func (s *KademliaServer) Ping(ctx context.Context, req *pb.PingReq) (*pb.PingRes, error) {

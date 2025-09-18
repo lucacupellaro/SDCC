@@ -25,6 +25,7 @@ const (
 	Kademlia_GetKBucket_FullMethodName   = "/kad.Kademlia/GetKBucket"
 	Kademlia_Ping_FullMethodName         = "/kad.Kademlia/Ping"
 	Kademlia_UpdateBucket_FullMethodName = "/kad.Kademlia/UpdateBucket"
+	Kademlia_Rebalance_FullMethodName    = "/kad.Kademlia/Rebalance"
 )
 
 // KademliaClient is the client API for Kademlia service.
@@ -39,6 +40,7 @@ type KademliaClient interface {
 	GetKBucket(ctx context.Context, in *GetKBucketReq, opts ...grpc.CallOption) (*GetKBucketResp, error)
 	Ping(ctx context.Context, in *PingReq, opts ...grpc.CallOption) (*PingRes, error)
 	UpdateBucket(ctx context.Context, in *UpdateBucketReq, opts ...grpc.CallOption) (*UpdateBucketRes, error)
+	Rebalance(ctx context.Context, in *RebalanceReq, opts ...grpc.CallOption) (*RebalanceRes, error)
 }
 
 type kademliaClient struct {
@@ -109,6 +111,16 @@ func (c *kademliaClient) UpdateBucket(ctx context.Context, in *UpdateBucketReq, 
 	return out, nil
 }
 
+func (c *kademliaClient) Rebalance(ctx context.Context, in *RebalanceReq, opts ...grpc.CallOption) (*RebalanceRes, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RebalanceRes)
+	err := c.cc.Invoke(ctx, Kademlia_Rebalance_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // KademliaServer is the server API for Kademlia service.
 // All implementations must embed UnimplementedKademliaServer
 // for forward compatibility.
@@ -121,6 +133,7 @@ type KademliaServer interface {
 	GetKBucket(context.Context, *GetKBucketReq) (*GetKBucketResp, error)
 	Ping(context.Context, *PingReq) (*PingRes, error)
 	UpdateBucket(context.Context, *UpdateBucketReq) (*UpdateBucketRes, error)
+	Rebalance(context.Context, *RebalanceReq) (*RebalanceRes, error)
 	mustEmbedUnimplementedKademliaServer()
 }
 
@@ -148,6 +161,9 @@ func (UnimplementedKademliaServer) Ping(context.Context, *PingReq) (*PingRes, er
 }
 func (UnimplementedKademliaServer) UpdateBucket(context.Context, *UpdateBucketReq) (*UpdateBucketRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateBucket not implemented")
+}
+func (UnimplementedKademliaServer) Rebalance(context.Context, *RebalanceReq) (*RebalanceRes, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Rebalance not implemented")
 }
 func (UnimplementedKademliaServer) mustEmbedUnimplementedKademliaServer() {}
 func (UnimplementedKademliaServer) testEmbeddedByValue()                  {}
@@ -278,6 +294,24 @@ func _Kademlia_UpdateBucket_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Kademlia_Rebalance_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RebalanceReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(KademliaServer).Rebalance(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Kademlia_Rebalance_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(KademliaServer).Rebalance(ctx, req.(*RebalanceReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Kademlia_ServiceDesc is the grpc.ServiceDesc for Kademlia service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -308,6 +342,10 @@ var Kademlia_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateBucket",
 			Handler:    _Kademlia_UpdateBucket_Handler,
+		},
+		{
+			MethodName: "Rebalance",
+			Handler:    _Kademlia_Rebalance_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

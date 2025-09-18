@@ -23,6 +23,7 @@ EOF
 for i in $(seq 1 "$N"); do
   cat >> docker-compose.yml <<EOF
   node$i:
+    image: "kademlia-nft-node:latest"
     build: .
     environment:
       - NODE_ID=node$i

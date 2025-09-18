@@ -5,7 +5,7 @@ package kad;
 
 option go_package = "proto/kad;kad";
 
-// ---- Tipi minimi per Store ----
+
 message Node {
   string id   = 1;
   string host = 2;
@@ -65,8 +65,21 @@ message PingRes {
   int64  unix_ms = 3;   // timestamp server
 }
 
-message UpdateBucketReq { Node contact = 1; }  // “ho visto questo nodo”
+message UpdateBucketReq { Node contact = 1; } 
 message UpdateBucketRes { bool ok = 1; }
+
+
+message RebalanceReq {
+  string target_id = 1;       // id del nodo che deve ribilanciarsi
+  repeated Node nodes = 2;    // lista nodi attivi
+  int32 k = 3;                // (opzionale) fattore di replica
+}
+
+message RebalanceRes {
+  int32 moved = 1;            // quanti NFT spostati
+  int32 kept  = 2;            // quanti NFT mantenuti
+  string message = 3;         // log di riepilogo
+}
 
 
 // ---- Servizio ----
@@ -77,5 +90,6 @@ service Kademlia {
   rpc GetKBucket(GetKBucketReq) returns (GetKBucketResp);
   rpc Ping (PingReq) returns (PingRes);
   rpc UpdateBucket(UpdateBucketReq) returns (UpdateBucketRes); 
+  rpc Rebalance(RebalanceReq) returns (RebalanceRes);
 
 }

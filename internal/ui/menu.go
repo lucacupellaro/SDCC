@@ -19,7 +19,6 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types"
-
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
@@ -37,6 +36,8 @@ const (
 	MenuUseNode
 	MenuSearchNFT
 	MenuShowEdges
+	MenuRebalancing
+	MenuRemoveNode
 	MenuQuit
 )
 
@@ -53,12 +54,14 @@ Benvenuto! Seleziona un'operazione:
   3) Cerca un NFT  
   4) Aggiungi un NFT
   5) Aggiungi un nodo
-  6) Esci
+  6) Rebalancing delle risorse
+  7) Rimuovi un nodo
+  8) Esci
 `)
 
 	reader := bufio.NewReader(os.Stdin)
 	for {
-		fmt.Print("Scegli [1-6]: ")
+		fmt.Print("Scegli [1-7]: ")
 		line, _ := reader.ReadString('\n')
 		line = strings.TrimSpace(line)
 		switch line {
@@ -71,8 +74,12 @@ Benvenuto! Seleziona un'operazione:
 		case "4":
 			return MenuSearchNFT
 		case "5":
-			return MenuShowEdges
-		case "6", "q", "Q", "exit", "quit":
+			return MenuRemoveNode
+		case "6":
+			return MenuRebalancing
+		case "7":
+			return MenuRemoveNode
+		case "8", "q", "Q", "exit", "quit":
 			return MenuQuit
 		default:
 			fmt.Println("Scelta non valida, riprova.")
@@ -82,8 +89,7 @@ Benvenuto! Seleziona un'operazione:
 
 // Restituisce i servizi Compose attivi (node1, node2, ...) del progetto.
 func ListActiveComposeServices(project string) ([]string, error) {
-	// Filtra per progetto per non mischiare altri container.
-	// --format {{.Names}} per ottenere i nomi dei container es.: kademlia-nft-node1-1
+
 	cmd := exec.Command("docker", "ps",
 		"--filter", "label=com.docker.compose.project="+project,
 		"--format", "{{.Names}}",
@@ -263,17 +269,6 @@ func check(value string, list []Pair) string {
 	return "NOTFOUND"
 }
 
-func hexToString(hexStr string) (string, error) {
-	hexStr = strings.TrimSpace(hexStr)
-	hexStr = strings.TrimPrefix(hexStr, "0x")    // gestisce prefisso "0x"
-	hexStr = strings.ReplaceAll(hexStr, " ", "") // rimuove spazi
-	b, err := hex.DecodeString(hexStr)
-	if err != nil {
-		return "", err
-	}
-	return string(b), nil
-}
-
 func Reverse2(nodes []string) ([]Pair, error) {
 	//recupero dal file nodi e hash
 
@@ -317,10 +312,13 @@ func sceltaNodoPiuVicino(nftID20 []byte, nodiVicini []string) (string, error) {
 func RPCGetKBucket(nodeAddr string) ([]string, error) {
 
 	add, err := resolveStartHostPort(nodeAddr)
+	fmt.Printf("Risolvo %s in %s\n", nodeAddr, add)
 	fmt.Printf("🔍 Recupero KBucket di %s\n", add)
+
 	if err != nil {
 		return nil, fmt.Errorf("risoluzione %q fallita: %w", nodeAddr, err)
 	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -348,69 +346,6 @@ func RPCGetKBucket(nodeAddr string) ([]string, error) {
 	return res, nil
 }
 
-/*
-func PingNode(startNode, targetNode string) {
-	current := startNode
-	targetID := logica.NewIDFromToken(targetNode, 20) // per distanza XOR
-	visited := map[string]bool{}
-	maxHops := 20
-	var nodeVisited []string
-
-	for hop := 0; hop < maxHops; hop++ {
-		fmt.Printf("🔍 Inizio PING da %s a %s (hop %d)\n", current, targetNode, hop+1)
-
-		// 1) KBucket del nodo corrente
-		nodi, err := RPCGetKBucket(current)
-		if err != nil {
-			log.Fatal("Errore RPCGetKBucket:", err)
-		}
-
-		// Se il server ti restituisce esadecimale, normalizza a "nodeX".
-		nodi = normalizeIDs(nodi)
-
-		// 2) Trovato direttamente?
-		found := false
-		for _, n := range nodi {
-			if n == targetNode {
-				found = true
-				break
-			}
-		}
-		if found {
-			fmt.Printf("🔍 Nodo %s trovato in KBucket di %s\n", targetNode, current)
-			fmt.Printf("🔍 Stiamo mandando una richista di Ping\n")
-			if err := SendPing(current, targetNode); err != nil {
-				fmt.Printf("⚠️  Errore durante l'invio del Ping: %v\n", err)
-			}
-			return
-		}
-
-		// 3) Scegli il prossimo vicino al target evitando i già visitati
-		visited[current] = true
-		candidates := make([]string, 0, len(nodi))
-		for _, n := range nodi {
-			if !visited[n] {
-				candidates = append(candidates, n)
-			}
-		}
-		if len(candidates) == 0 {
-			fmt.Println("✖ Nessun vicino non visitato — arresto.")
-			return
-		}
-
-		best, err := sceltaNodoPiuVicino(targetID, candidates)
-		if err != nil {
-			fmt.Printf("⚠️  Impossibile scegliere il nodo più vicino: %v\n", err)
-			return
-		}
-		fmt.Printf("➡️  Prossimo nodo scelto: %s\n", best)
-		current = best
-	}
-
-	fmt.Println("⛔ Max hop raggiunto senza raggiungere il target.")
-}
-*/
-
 func xorDist(a20 []byte, b20 []byte) *big.Int {
 	nb := make([]byte, len(a20))
 	for i := range a20 {
@@ -419,25 +354,36 @@ func xorDist(a20 []byte, b20 []byte) *big.Int {
 	return new(big.Int).SetBytes(nb)
 }
 
-func PingNode(startNode, targetNode string) {
-	targetID := logica.NewIDFromToken(targetNode, 20)
-	visited := map[string]bool{}
-	candidates := map[string]bool{} // insieme senza duplicati
-	addCand := func(list []string) {
-		for _, n := range list {
-			if n == "" {
-				continue
-			}
-			candidates[n] = true
+func PingNode(startNode, targetNode string, pairs []Pair) {
+	targetID := logica.Sha1ID(targetNode)
+
+	// indice hex -> nodeID (esa=hex, hash=nodeID)
+	hex2id := make(map[string]string, len(pairs))
+	for _, p := range pairs {
+		h := strings.ToLower(strings.TrimSpace(p.esa))
+		id := strings.TrimSpace(p.hash)
+		if h != "" && id != "" {
+			hex2id[h] = id
 		}
 	}
 
-	// seed: parti dal nodo iniziale e dai suoi vicini
+	visited := map[string]bool{}
+	candidates := map[string]bool{}
+	addCand := func(list []string) {
+		for _, n := range list {
+			n = strings.TrimSpace(n)
+			if n == "" {
+				continue
+			}
+			candidates[n] = true // set
+		}
+	}
+
 	addCand([]string{startNode})
 
-	bestDist := (*big.Int)(nil)
+	var bestDist *big.Int
 	stagnate := 0
-	maxHops := 30
+	const maxHops = 15
 
 	for hop := 0; hop < maxHops; hop++ {
 		// scegli il candidato non visitato più vicino al target
@@ -447,10 +393,9 @@ func PingNode(startNode, targetNode string) {
 			if visited[id] {
 				continue
 			}
-			d := xorDist(targetID, logica.NewIDFromToken(id, 20))
+			d := xorDist(targetID, logica.Sha1ID(id)) // distanza su ID "umano"
 			if next == "" || d.Cmp(nextD) < 0 {
-				next = id
-				nextD = d
+				next, nextD = id, d
 			}
 		}
 		if next == "" {
@@ -461,17 +406,35 @@ func PingNode(startNode, targetNode string) {
 		fmt.Printf("🔍 Inizio PING da %s a %s (hop %d)\n", next, targetNode, hop+1)
 		visited[next] = true
 
-		// prendi KBucket del candidato
-		kb, err := RPCGetKBucket(next)
+		// prendi il KBucket del nodo "next"
+		kbRaw, err := RPCGetKBucket(next) // restituisce []string ma attualmente sono HEX token
 		if err != nil {
 			fmt.Printf("⚠️  GetKBucket(%s) fallita: %v\n", next, err)
 			continue
 		}
-		kb = normalizeIDs(kb)
-		fmt.Printf("🔎 %s ha %d vicini\n", next, len(kb))
+		fmt.Printf("KBucket (raw) di %s: %v\n", next, kbRaw)
+
+		// mappa ogni entry in un ID "umano": prima prova con hex2id, poi accetta già "nodeX"
+		kbIDs := make([]string, 0, len(kbRaw))
+		for _, s := range kbRaw {
+			t := strings.ToLower(strings.TrimSpace(s))
+			if t == "" {
+				continue
+			}
+			if id, ok := hex2id[t]; ok {
+				kbIDs = append(kbIDs, id)
+				continue
+			}
+			if looksLikeNodeID(s) { // es. "node7"
+				kbIDs = append(kbIDs, strings.TrimSpace(s))
+			}
+			// altrimenti scarta: non usare mai binario o hex come ID
+		}
+
+		fmt.Printf("🔎 %s ha %d vicini (IDs: %v)\n", next, len(kbIDs), kbIDs)
 
 		// target presente?
-		for _, n := range kb {
+		for _, n := range kbIDs {
 			if n == targetNode {
 				fmt.Printf("✅ %s conosce %s — invio Ping…\n", next, targetNode)
 				if err := SendPing(next, targetNode); err != nil {
@@ -482,7 +445,7 @@ func PingNode(startNode, targetNode string) {
 		}
 
 		// accumula nuovi candidati
-		addCand(kb)
+		addCand(kbIDs)
 
 		// controllo progresso
 		if bestDist == nil || nextD.Cmp(bestDist) < 0 {
@@ -499,18 +462,21 @@ func PingNode(startNode, targetNode string) {
 	fmt.Println("⛔ Max hop raggiunto senza contattare il target.")
 }
 
-// Se GetKBucket ti manda esadecimale (20 byte = 40 char), decodifichiamo in "nodeX".
-func normalizeIDs(in []string) []string {
-	out := make([]string, 0, len(in))
-	for _, s := range in {
-		if len(s) == 40 { // sembra hex (20 byte)
-			if b, err := hex.DecodeString(s); err == nil {
-				s = string(bytes.TrimRight(b, "\x00"))
+func looksLikeNodeID(s string) bool {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return false
+	}
+	// semplice check: "node" + numero
+	if strings.HasPrefix(s, "node") {
+		for _, r := range s[4:] {
+			if r < '0' || r > '9' {
+				return false
 			}
 		}
-		out = append(out, s)
+		return true
 	}
-	return out
+	return false
 }
 
 func SendPing(fromID, targetName string) error {
@@ -548,65 +514,137 @@ func SendPing(fromID, targetName string) error {
 	return nil
 }
 
+/*
+	func AddNode(ctx context.Context, nodeName, seederAddr, hostPort string) error {
+		cli, err := client.NewClientWithOpts(client.FromEnv)
+		if err != nil {
+			return err
+		}
+		defer cli.Close()
+
+		// percorso assoluto della cartella locale
+		hostDataPath, err := filepath.Abs("./data/" + nodeName)
+		if err != nil {
+			return err
+		}
+
+		// Configurazione del container
+		config := &container.Config{
+			Image: "kademlia-nft-node", // immagine generica che hai buildato
+			Env: []string{
+				"NODE_ID=" + nodeName,
+				"DATA_DIR=/data",
+				"SEEDER_ADDR=" + seederAddr,
+			},
+			ExposedPorts: nat.PortSet{
+				"8000/tcp": struct{}{},
+			},
+		}
+
+		hostConfig := &container.HostConfig{
+			Binds: []string{
+				fmt.Sprintf("%s:/data", hostDataPath), // bind mount con path assoluto
+			},
+			PortBindings: nat.PortMap{
+				"8000/tcp": []nat.PortBinding{
+					{HostIP: "0.0.0.0", HostPort: hostPort},
+				},
+			},
+		}
+
+		networkingConfig := &network.NetworkingConfig{
+			EndpointsConfig: map[string]*network.EndpointSettings{
+				"kademlia-nft_kadnet": {},
+			},
+		}
+
+		// Crea il container
+		resp, err := cli.ContainerCreate(ctx, config, hostConfig, networkingConfig, nil, nodeName)
+		if err != nil {
+			return err
+		}
+
+		// Avvia il container
+		if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+			return err
+		}
+
+		fmt.Printf("✅ Nodo %s avviato sulla porta %s\n", nodeName, hostPort)
+		return nil
+	}
+*/
 func AddNode(ctx context.Context, nodeName, seederAddr, hostPort string) error {
-	cli, err := client.NewClientWithOpts(client.FromEnv)
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return err
 	}
 	defer cli.Close()
 
-	// percorso assoluto della cartella locale
-	hostDataPath, err := filepath.Abs("./data/" + nodeName)
+	// Path host per il bind mount: deve esistere
+	hostDataPath, err := filepath.Abs(filepath.Join("./data", nodeName))
 	if err != nil {
 		return err
 	}
+	if err := os.MkdirAll(hostDataPath, 0o755); err != nil {
+		return err
+	}
 
-	// Configurazione del container
+	// Verifica che la network di Compose esista
+	if _, err := cli.NetworkInspect(ctx, "kademlia-nft_kadnet", types.NetworkInspectOptions{}); err != nil {
+		return fmt.Errorf("rete 'kademlia-nft_kadnet' non trovata: %w", err)
+	}
+
+	port := nat.Port("8000/tcp")
+
 	config := &container.Config{
-		Image: "kademlia-nft-node", // immagine generica che hai buildato
+		Image: "kademlia-nft-node:latest",
 		Env: []string{
 			"NODE_ID=" + nodeName,
 			"DATA_DIR=/data",
 			"SEEDER_ADDR=" + seederAddr,
 		},
-		ExposedPorts: nat.PortSet{
-			"8000/tcp": struct{}{},
+		ExposedPorts: nat.PortSet{port: struct{}{}},
+		Labels: map[string]string{
+			"com.docker.compose.project": "kademlia-nft",
+			"com.docker.compose.service": nodeName, // es. "node12"
+			"com.docker.compose.version": "2",
 		},
 	}
 
 	hostConfig := &container.HostConfig{
-		Binds: []string{
-			fmt.Sprintf("%s:/data", hostDataPath), // bind mount con path assoluto
-		},
+		Binds: []string{fmt.Sprintf("%s:/data", hostDataPath)},
 		PortBindings: nat.PortMap{
-			"8000/tcp": []nat.PortBinding{
-				{HostIP: "0.0.0.0", HostPort: hostPort},
-			},
+			port: []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: hostPort}},
 		},
+		RestartPolicy: container.RestartPolicy{Name: "unless-stopped"},
 	}
 
 	networkingConfig := &network.NetworkingConfig{
 		EndpointsConfig: map[string]*network.EndpointSettings{
-			"kademlia-nft_kadnet": {},
+			"kademlia-nft_kadnet": {
+				Aliases: []string{nodeName}, // es. "node12"
+			},
 		},
 	}
 
-	// Crea il container
-	resp, err := cli.ContainerCreate(ctx, config, hostConfig, networkingConfig, nil, nodeName)
+	// Nome stile Compose: kademlia-nft-node12-1
+	name := fmt.Sprintf("kademlia-nft-%s-1", nodeName)
+
+	resp, err := cli.ContainerCreate(ctx, config, hostConfig, networkingConfig, nil, name)
 	if err != nil {
 		return err
 	}
 
-	// Avvia il container
+	// *** AVVIA il container ***
 	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
 		return err
 	}
 
-	fmt.Printf("✅ Nodo %s avviato sulla porta %s\n", nodeName, hostPort)
+	fmt.Printf("✅ Nodo %s (%s) avviato sulla porta %s\n", nodeName, resp.ID[:12], hostPort)
 	return nil
 }
 
-func BiggerNodes(nodi []string) string {
+func BiggerNodes(nodi []string) (string, int) {
 	var maxID = -1
 
 	for _, n := range nodi {
@@ -624,5 +662,16 @@ func BiggerNodes(nodi []string) string {
 	}
 
 	// ritorna il nuovo nodo con ID incrementato
-	return "node" + strconv.Itoa(maxID+1)
+	return "node" + strconv.Itoa(maxID+1), maxID + 1
+}
+
+func RemoveNode(serviceName string) error {
+	// -s = stop, -f = force
+	cmd := exec.Command("docker", "compose", "rm", "-sf", serviceName)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("errore rimozione nodo %s: %v\nOutput: %s", serviceName, err, string(out))
+	}
+	fmt.Printf("✅ Nodo %s rimosso.\n", serviceName)
+	return nil
 }

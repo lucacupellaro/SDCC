@@ -4,9 +4,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -126,4 +129,32 @@ func HexToString(hexStr string) (string, error) {
 		return "", err
 	}
 	return string(b), nil
+}
+
+var reNode = regexp.MustCompile(`^node(\d+)$`)
+
+func nextNodeNameAndPort(nodi []string) (string, string) {
+	maxN := 0
+	for _, s := range nodi {
+		s = strings.TrimSpace(s)
+		m := reNode.FindStringSubmatch(s)
+		if len(m) == 2 {
+			if n, err := strconv.Atoi(m[1]); err == nil && n > maxN {
+				maxN = n
+			}
+		}
+	}
+	newN := maxN + 1 // es. se max è 11 → newN=12
+	nodeName := fmt.Sprintf("node%d", newN)
+	hostPort := strconv.Itoa(8000 + newN) // 8000+12 = 8012
+	return nodeName, hostPort
+}
+
+func isPortFree(port string) bool {
+	ln, err := net.Listen("tcp", "127.0.0.1:"+port)
+	if err != nil {
+		return false
+	}
+	_ = ln.Close()
+	return true
 }

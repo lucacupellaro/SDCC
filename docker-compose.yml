@@ -1,5 +1,6 @@
 services:
   node1:
+    image: "kademlia-nft-node:latest"
     build: .
     environment:
       - NODE_ID=node1
@@ -14,6 +15,7 @@ services:
       - kadnet
 
   node2:
+    image: "kademlia-nft-node:latest"
     build: .
     environment:
       - NODE_ID=node2
@@ -26,6 +28,7 @@ services:
       - kadnet
 
   node3:
+    image: "kademlia-nft-node:latest"
     build: .
     environment:
       - NODE_ID=node3
@@ -38,6 +41,7 @@ services:
       - kadnet
 
   node4:
+    image: "kademlia-nft-node:latest"
     build: .
     environment:
       - NODE_ID=node4
@@ -50,6 +54,7 @@ services:
       - kadnet
 
   node5:
+    image: "kademlia-nft-node:latest"
     build: .
     environment:
       - NODE_ID=node5
@@ -62,6 +67,7 @@ services:
       - kadnet
 
   node6:
+    image: "kademlia-nft-node:latest"
     build: .
     environment:
       - NODE_ID=node6
@@ -74,6 +80,7 @@ services:
       - kadnet
 
   node7:
+    image: "kademlia-nft-node:latest"
     build: .
     environment:
       - NODE_ID=node7
@@ -86,6 +93,7 @@ services:
       - kadnet
 
   node8:
+    image: "kademlia-nft-node:latest"
     build: .
     environment:
       - NODE_ID=node8
@@ -98,6 +106,7 @@ services:
       - kadnet
 
   node9:
+    image: "kademlia-nft-node:latest"
     build: .
     environment:
       - NODE_ID=node9
@@ -110,6 +119,7 @@ services:
       - kadnet
 
   node10:
+    image: "kademlia-nft-node:latest"
     build: .
     environment:
       - NODE_ID=node10
@@ -122,6 +132,7 @@ services:
       - kadnet
 
   node11:
+    image: "kademlia-nft-node:latest"
     build: .
     environment:
       - NODE_ID=node11
