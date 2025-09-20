@@ -25,7 +25,6 @@ import (
 	pb "kademlia-nft/proto/kad"
 )
 
-// tipi condivisi/esportati
 type NFT struct {
 	Index             string
 	Name              string
@@ -356,7 +355,8 @@ func StoreNFTToNodes(nft NFT, tokenID []byte, name string, nodes []string, ttlSe
 		return errors.New("tokenID vuoto")
 	}
 
-	tokenIDStr := fmt.Sprintf("%x.json", tokenID)
+	//tokenIDStr := fmt.Sprintf("%x.json", tokenID)
+	tokenIDStr := hex.EncodeToString(tokenID)
 
 	payload, err := json.Marshal(struct {
 		TokenID string `json:"token_id"`

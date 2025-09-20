@@ -33,16 +33,17 @@ type MenuChoice int
 const (
 	MenuListNodes MenuChoice = iota + 1
 	MenuShowBucket
-	MenuUseNode
+	MenuPing
 	MenuSearchNFT
-	MenuShowEdges
-	MenuRebalancing
+	MenuAddNFT
+	MenuAddNode
+	MenuRebalance
 	MenuRemoveNode
 	MenuQuit
 )
 
 func ShowWelcomeMenu() MenuChoice {
-	fmt.Print("\033[2J\033[H") // clear screen
+	fmt.Print("\033[2J\033[H")
 	fmt.Println(`
 ╔══════════════════════════════════════════════╗
 ║        Kademlia NFT – Console Control        ║
@@ -61,26 +62,26 @@ Benvenuto! Seleziona un'operazione:
 
 	reader := bufio.NewReader(os.Stdin)
 	for {
-		fmt.Print("Scegli [1-7]: ")
+		fmt.Print("Scegli [1-8]: ") // <-- coerente con 1..8
 		line, _ := reader.ReadString('\n')
 		line = strings.TrimSpace(line)
 		switch line {
 		case "1":
-			return MenuListNodes
+			return MenuChoice(1)
 		case "2":
-			return MenuShowBucket
+			return MenuChoice(2)
 		case "3":
-			return MenuUseNode
+			return MenuChoice(3)
 		case "4":
-			return MenuSearchNFT
+			return MenuChoice(4)
 		case "5":
-			return MenuRemoveNode
+			return MenuChoice(5)
 		case "6":
-			return MenuRebalancing
+			return MenuChoice(6)
 		case "7":
-			return MenuRemoveNode
+			return MenuChoice(7)
 		case "8", "q", "Q", "exit", "quit":
-			return MenuQuit
+			return MenuChoice(8)
 		default:
 			fmt.Println("Scelta non valida, riprova.")
 		}

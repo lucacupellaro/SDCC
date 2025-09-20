@@ -89,7 +89,7 @@ func main() {
 		}
 		fmt.Printf("✅ File salvato in: %s\n", out)
 
-		//fissato nft quindi per ogni nft , crei unafunzione che per ogni nft scorre tutti e e 10 gli id dei nodi e li assegna ai 2/3 pi vicini)
+		//fissato nft quindi per ogni nft , creo unafunzione che per ogni nft scorre tutti e gli id dei nodi e li assegna ai 2 piu vicini)
 
 		fmt.Println("Assegnazione dei k nodeID più vicini agli NFT...")
 
